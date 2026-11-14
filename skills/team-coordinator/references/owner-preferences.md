@@ -25,11 +25,13 @@ Scope: agent coordination and human product review.
 
 - One lead agent per area of focus, and a chief of staff that oversees them.
 - Decisions and reviews reach the human through one prioritized queue, in batches.
-- Product reviews carry screenshots and a short feature video.
+- Every UX change and product review carries screenshots and a short, playable
+  feature video from the exact candidate build, linked in the handoff or completion
+  report. Missing or stale captures leave UX work unfinished.
 - Review works by voice and keyboard shortcuts; leads bring useful new ideas.
 - Learn from actual owner feedback so recommendations need fewer corrections.
-- Exceptions: internal and documentation-only changes need no artificial demo;
-  runtime limits are reported honestly. Production release authority and tool
+- Exceptions: internal and documentation-only changes with no UX effect need no
+  artificial demo; runtime limits are reported honestly. Production release authority and tool
   approval stay with the session and repository instructions.
 
 ## Default: tests before builders

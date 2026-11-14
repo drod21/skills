@@ -29,6 +29,12 @@ win over this page.
 
 - Do not report validation or a PR complete until every check that ran on it, and
   every check you ran, has finished and you have inspected each final result.
+- For every UX change, include retained screenshots of the affected surfaces and
+  a short, playable video of the changed interaction and result in the handoff, PR
+  or completion report. Capture both from the exact candidate build using
+  authorized runtime tools and identify its SHA, any uncommitted patch, build and
+  platform. Missing or stale captures leave the UX change unfinished. Follow the
+  [evidence requirements](../team-coordinator/references/operating-cycle.md#product-review-packet).
 - Report source checks, runtime verification and post-merge verification on the
   default branch separately.
 - Before reporting what a build, release or flag contains, read the live state at

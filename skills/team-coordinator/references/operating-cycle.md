@@ -110,6 +110,12 @@ not authorize deployment or a production release.
 
 ## Product review packet
 
+Every UX change requires screenshots of the affected surfaces and a short,
+playable video demonstrating the changed interaction and result from the exact
+candidate build, including standalone work and changes without a human product
+review. Retain and link both in the handoff or completion report. Missing or stale
+captures leave the UX change unfinished.
+
 For every product review, attach:
 
 - User problem, intended outcome, concise before/after behavior, recommendation
@@ -127,8 +133,8 @@ QA verifies the artifacts match the candidate and demonstrate the claim; the are
 lead checks completeness before chief-of-staff triage. Missing screenshots or
 video leave a product review unready. Keep working on obtainable evidence;
 escalate an inaccessible runtime as a blocker rather than presenting old or
-synthetic captures as proof. Documentation-only and internal changes can record
-why product review is not applicable; never manufacture a demo for them. Retain
+synthetic captures as proof. Documentation-only and internal changes with no UX
+effect can record why product review is not applicable; never manufacture a demo for them. Retain
 artifacts at durable task-owned paths. A code or evidence change requires fresh
 affected verification, and the existing gate rules still apply.
 

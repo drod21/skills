@@ -7,7 +7,10 @@ description: Handle ux-worker tasks for web or mobile layout, navigation, copy a
 
 For team work use the [worker protocol](../team-coordinator/references/worker-protocol.md) with role `ux-worker`.
 
-For product review, prepare the screenshots and feature video required by the
+For every UX change, capture screenshots of the affected surfaces and a short,
+playable video showing the changed interaction and result from the exact candidate
+build. Retain and link both in the handoff or completion report, including for
+standalone work. Follow the evidence requirements in the
 [product review packet](../team-coordinator/references/operating-cycle.md#product-review-packet).
 Apply the referenced owner preferences before handing the packet to the area lead;
 keep missing runtime evidence visible as a blocker.
@@ -27,7 +30,7 @@ Run every changed screen at the default and the largest text size on a small scr
 in light and dark: every control, row and primary action must stay reachable by
 scrolling with nothing clipped or overlapped. Source review, and screenshots of a
 different build, do not prove this change. Report unavailable runtime prerequisites
-as a gap and keep the task unfinished when runtime verification is part of
-acceptance. For design law, invoke the `anti-slop-design` skill when it is
+as a blocker and keep the UX change unfinished until current screenshots and
+video are available. For design law, invoke the `anti-slop-design` skill when it is
 installed, and re-check every point before handoff. Do not turn scoped UI work into
 a redesign.

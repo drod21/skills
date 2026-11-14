@@ -7,6 +7,9 @@ description: Handle qa-worker tasks for independent behavioral tests, regression
 
 For team work use the [worker protocol](../team-coordinator/references/worker-protocol.md) with role `qa-worker`.
 
+For every UX change, including standalone work, verify retained screenshots of
+the affected surfaces and a short, playable video of the changed interaction and
+result before completion. Missing or stale captures leave the UX change unfinished.
 Validate the [product review packet](../team-coordinator/references/operating-cycle.md#product-review-packet)
 before the area lead forwards it: screenshots and playable video must match the
 candidate build and demonstrate its claimed outcome. Return missing or stale

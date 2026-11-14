@@ -3,10 +3,10 @@
 # .claude at those copies. Dry run by default; pass --apply to write.
 #   <project>/.agents/skills/X   <- copy of <toolkit>/skills/X
 #   <project>/.claude/skills/X   -> ../../.agents/skills/X   (relative symlink)
-# Never overwrites an existing real entry. A link that still points at this toolkit
-# is replaced with a fresh copy under .agents.
+# With --apply, replaces same-named skills and Claude links, including stale files.
+# Unrelated skill names and external symlink targets are preserved.
 #   bin/link-skills.sh [--apply] [--install-pstack] PROJECT_DIR
-# chief-of-staff ships in this toolkit, so it is installed when missing. pstack is
+# chief-of-staff ships in this toolkit and is refreshed on apply. pstack is
 # third-party (a Claude Code plugin); --install-pstack --apply installs it only if absent.
 set -euo pipefail
 
@@ -41,77 +41,47 @@ project_dir="$(cd "$project_dir" && pwd)"
 agents_skills="$project_dir/.agents/skills"
 claude_skills="$project_dir/.claude/skills"
 
-# True when dest is a symlink into this toolkit (old layout).
-points_at_toolkit() {
-  local dest="$1" current=""
-  [ -L "$dest" ] || return 1
-  current="$(readlink "$dest")"
-  case "$current" in
-    "$root"/*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
-
 copy_skill() { # src dest
-  local src="$1" dest="$2"
-  if [ -L "$dest" ] && [ "$(readlink "$dest")" = "$src" ]; then
-    # Still the old absolute link; replace with a copy under --apply.
-    if [ "$apply" = 1 ]; then
-      rm "$dest"
-      cp -R "$src" "$dest"
-      echo "copied   $dest (was link -> $src)"
+  local src="$1" dest="$2" staged=""
+  if [ "$apply" = 0 ]; then
+    if [ -e "$dest" ] || [ -L "$dest" ]; then
+      echo "would    replace $dest with copy of $src"
     else
-      echo "would    copy $dest (replace link -> $src)"
+      echo "would    copy $dest"
     fi
-  elif points_at_toolkit "$dest"; then
-    local current
-    current="$(readlink "$dest")"
-    if [ "$apply" = 1 ]; then
-      rm "$dest"
-      cp -R "$src" "$dest"
-      echo "copied   $dest (was link -> $current)"
-    else
-      echo "would    copy $dest (replace link -> $current)"
-    fi
-  elif [ -e "$dest" ] || [ -L "$dest" ]; then
-    echo "SKIP     $dest exists; not overwritten"
-  elif [ "$apply" = 1 ]; then
-    mkdir -p "$(dirname "$dest")"
-    cp -R "$src" "$dest"
-    echo "copied   $dest"
-  else
-    echo "would    copy $dest"
+    return
   fi
+  mkdir -p "$(dirname "$dest")"
+  # Copy before removing the old entry; never follow a destination symlink.
+  staged="$(mktemp -d "$(dirname "$dest")/.skill-install.XXXXXX")"
+  if ! cp -R "$src/." "$staged/"; then
+    rm -rf "$staged"
+    return 1
+  fi
+  rm -rf "$dest"
+  mv "$staged" "$dest"
+  echo "copied   $dest"
 }
 
 # Relative symlink from .claude/skills/X to ../../.agents/skills/X.
-# Re-points an old absolute toolkit link; otherwise skips real conflicts.
 link_claude() { # relative_src dest
   local src="$1" dest="$2" current=""
+  # A shared skills directory already exposes the copies; linking would loop.
+  if [ -d "$claude_skills" ] && [ -d "$agents_skills" ] &&
+    [ "$(cd "$claude_skills" && pwd -P)" = "$(cd "$agents_skills" && pwd -P)" ]; then
+    echo "ok       $dest (shared skills directory)"
+    return
+  fi
   [ -L "$dest" ] && current="$(readlink "$dest")"
   if [ "$current" = "$src" ]; then
     echo "ok       $dest"
-  elif [ -n "$current" ] && case "$current" in "$root"/*) true ;; *) false ;; esac; then
-    if [ "$apply" = 1 ]; then
-      if ln -sfn "$src" "$dest" 2>/dev/null; then
-        echo "relinked $dest -> $src (was $current)"
-      else
-        echo "SKIP     $dest: could not relink"
-      fi
-    else
-      echo "would    relink $dest -> $src (was $current)"
-    fi
-  elif [ -e "$dest" ] || [ -L "$dest" ]; then
-    echo "SKIP     $dest exists (points to ${current:-a real file}); not overwritten"
   elif [ "$apply" = 1 ]; then
     mkdir -p "$(dirname "$dest")"
-    if ln -s "$src" "$dest" 2>/dev/null; then
-      echo "linked   $dest -> $src"
-    else
-      echo "SKIP     $dest: could not create symlink"
-    fi
+    rm -rf "$dest"
+    ln -s "$src" "$dest"
+    echo "linked   $dest -> $src"
   else
-    echo "would    $dest -> $src"
+    echo "would    replace $dest with link -> $src"
   fi
 }
 

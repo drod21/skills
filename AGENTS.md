@@ -32,9 +32,10 @@ it from `$TOOLKIT/skills/`.
 Install: `pnpm install` once here, then `bin/link-skills.sh PROJECT_DIR` to preview
 and `bin/link-skills.sh --apply PROJECT_DIR` to install. That copies each skill into
 `PROJECT_DIR/.agents/skills/` and tries a relative symlink from
-`PROJECT_DIR/.claude/skills/` to the matching `.agents` entry. It never overwrites
-an existing entry; a skill already installed under the same name is skipped and
-reported.
+`PROJECT_DIR/.claude/skills/` to the matching `.agents` entry. With `--apply`, it
+replaces existing same-named skill copies and Claude entries, removing stale
+files. Dry runs only report changes. Unrelated skill names and external symlink
+targets are preserved.
 
 ## Skills
 
@@ -94,7 +95,10 @@ integrated head. No pull request opens without an `adversary` PASS at its exact 
 **Evidence.** Report source, synthetic, replay, runtime, device and production
 evidence separately. A green board is not a deployment. A PASS that leaves an "owed"
 acceptance path unreachable is not acceptance. Mocked inputs do not prove real
-sensors.
+sensors. Every UX change requires screenshots of the affected surfaces and a short,
+playable video demonstrating the changed interaction and result from the exact
+candidate build. Retain and link both in the handoff or completion report; missing
+or stale captures leave the UX change unfinished.
 
 **Owner interaction.** Questions only the owner can answer go on the task
 (`ask-owner`), one open at a time, with a recommendation. Reversible calls are
