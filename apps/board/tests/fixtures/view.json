@@ -1,0 +1,506 @@
+{
+  "version": 1,
+  "revision": "1794315645761.1045-4905",
+  "now": "2026-11-10T13:00:45.831Z",
+  "lead": null,
+  "counts": {
+    "open": 6,
+    "claimed": 3,
+    "done": 2,
+    "cancelled": 3,
+    "archived": 0
+  },
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Tune the tab strip",
+      "status": "open",
+      "role": "ux-worker",
+      "tag": "board",
+      "owner": null,
+      "route": null,
+      "gated": true,
+      "accept": "Tune the tab strip works",
+      "archived": false,
+      "after": [],
+      "waitsOn": [],
+      "claimedAt": null,
+      "heartbeatAt": null,
+      "lastSignalAt": null,
+      "silent": false,
+      "doneAt": null,
+      "closedAt": null,
+      "wake": null,
+      "leadWake": null,
+      "run": null,
+      "evidenceCount": 0,
+      "ownerThread": {
+        "question": "NoAsk",
+        "note": "NoNote"
+      },
+      "doneBlockers": [
+        "NeverDoneUnchecked: no evidence",
+        "NeverDoneUnconfirmed: no confirmed check or accept for the current evidence"
+      ],
+      "reviewRevision": "e8f16efc1678954d74be16fbf0f443657a73c0123407e6f9590614ffe22ce7c5",
+      "messages": [],
+      "deliveries": [],
+      "undelivered": 0
+    },
+    {
+      "id": 2,
+      "title": "Add the events route",
+      "status": "open",
+      "role": "backend-worker",
+      "tag": "server",
+      "owner": null,
+      "route": null,
+      "gated": true,
+      "accept": "Add the events route works",
+      "archived": false,
+      "after": [],
+      "waitsOn": [],
+      "claimedAt": null,
+      "heartbeatAt": null,
+      "lastSignalAt": null,
+      "silent": false,
+      "doneAt": null,
+      "closedAt": null,
+      "wake": null,
+      "leadWake": null,
+      "run": null,
+      "evidenceCount": 0,
+      "ownerThread": {
+        "question": "NoAsk",
+        "note": "NoNote"
+      },
+      "doneBlockers": [
+        "NeverDoneUnchecked: no evidence",
+        "NeverDoneUnconfirmed: no confirmed check or accept for the current evidence"
+      ],
+      "reviewRevision": "12d2d37384a6e2a23116dbd7f69c9c44623068c4e5eb18643276b12501145fcd",
+      "messages": [],
+      "deliveries": [],
+      "undelivered": 0
+    },
+    {
+      "id": 3,
+      "title": "Write the browser check",
+      "status": "open",
+      "role": "qa-worker",
+      "tag": "verify",
+      "owner": null,
+      "route": null,
+      "gated": true,
+      "accept": "Write the browser check works",
+      "archived": false,
+      "after": [
+        1
+      ],
+      "waitsOn": [
+        {
+          "id": 1,
+          "status": "open"
+        }
+      ],
+      "claimedAt": null,
+      "heartbeatAt": null,
+      "lastSignalAt": null,
+      "silent": false,
+      "doneAt": null,
+      "closedAt": null,
+      "wake": null,
+      "leadWake": null,
+      "run": null,
+      "evidenceCount": 0,
+      "ownerThread": {
+        "question": "NoAsk",
+        "note": "NoNote"
+      },
+      "doneBlockers": [
+        "NeverDoneUnchecked: no evidence",
+        "NeverDoneUnconfirmed: no confirmed check or accept for the current evidence"
+      ],
+      "reviewRevision": "061ccebceb37949cacaff5c429a94aca621c35df40df00d45f98456e3de85b22",
+      "messages": [],
+      "deliveries": [],
+      "undelivered": 0
+    },
+    {
+      "id": 4,
+      "title": "Document the start command",
+      "status": "open",
+      "role": "lead",
+      "tag": "docs",
+      "owner": null,
+      "route": null,
+      "gated": false,
+      "accept": null,
+      "archived": false,
+      "after": [],
+      "waitsOn": [],
+      "claimedAt": null,
+      "heartbeatAt": null,
+      "lastSignalAt": null,
+      "silent": false,
+      "doneAt": null,
+      "closedAt": null,
+      "wake": null,
+      "leadWake": null,
+      "run": null,
+      "evidenceCount": 0,
+      "ownerThread": {
+        "question": "NoAsk",
+        "note": "NoNote"
+      },
+      "doneBlockers": [],
+      "reviewRevision": "5fcbca55d87a0e7a6833f90f2592a0b14a0fbf5f52c218300819663a30d7f421",
+      "messages": [],
+      "deliveries": [],
+      "undelivered": 0
+    },
+    {
+      "id": 5,
+      "title": "Audit the request guard",
+      "status": "open",
+      "role": "security-worker",
+      "tag": "server",
+      "owner": null,
+      "route": null,
+      "gated": true,
+      "accept": "Audit the request guard works",
+      "archived": false,
+      "after": [],
+      "waitsOn": [],
+      "claimedAt": null,
+      "heartbeatAt": null,
+      "lastSignalAt": null,
+      "silent": false,
+      "doneAt": null,
+      "closedAt": null,
+      "wake": null,
+      "leadWake": null,
+      "run": null,
+      "evidenceCount": 0,
+      "ownerThread": {
+        "question": "NoAsk",
+        "note": "NoNote"
+      },
+      "doneBlockers": [
+        "NeverDoneUnchecked: no evidence",
+        "NeverDoneUnconfirmed: no confirmed check or accept for the current evidence"
+      ],
+      "reviewRevision": "30aa7a0db7fcc5424f6a50f685a6c8aee10062df82a238df63ab57195171a390",
+      "messages": [],
+      "deliveries": [],
+      "undelivered": 0
+    },
+    {
+      "id": 6,
+      "title": "Profile the card list",
+      "status": "open",
+      "role": "perf-worker",
+      "tag": "board",
+      "owner": null,
+      "route": null,
+      "gated": true,
+      "accept": "Profile the card list works",
+      "archived": false,
+      "after": [],
+      "waitsOn": [],
+      "claimedAt": null,
+      "heartbeatAt": null,
+      "lastSignalAt": null,
+      "silent": false,
+      "doneAt": null,
+      "closedAt": null,
+      "wake": null,
+      "leadWake": null,
+      "run": null,
+      "evidenceCount": 0,
+      "ownerThread": {
+        "question": "NoAsk",
+        "note": "NoNote"
+      },
+      "doneBlockers": [
+        "NeverDoneUnchecked: no evidence",
+        "NeverDoneUnconfirmed: no confirmed check or accept for the current evidence"
+      ],
+      "reviewRevision": "02c7283678bd7daf9e2508fe7578aedf14ee4bad5fc1880cca5c41ed4656706e",
+      "messages": [],
+      "deliveries": [],
+      "undelivered": 0
+    },
+    {
+      "id": 7,
+      "title": "Draw the column heads",
+      "status": "claimed",
+      "role": "ux-worker",
+      "tag": "board",
+      "owner": "worker-ux",
+      "route": null,
+      "gated": true,
+      "accept": "Draw the column heads works",
+      "archived": false,
+      "after": [],
+      "waitsOn": [],
+      "claimedAt": "2026-11-10T13:00:44.644Z",
+      "heartbeatAt": null,
+      "lastSignalAt": "2026-11-10T13:00:44.644Z",
+      "silent": false,
+      "doneAt": null,
+      "closedAt": null,
+      "wake": null,
+      "leadWake": null,
+      "run": null,
+      "evidenceCount": 0,
+      "ownerThread": {
+        "question": "Asked",
+        "note": "NoNote"
+      },
+      "doneBlockers": [
+        "NeverDoneUnchecked: no evidence",
+        "NeverDoneUnconfirmed: no confirmed check or accept for the current evidence",
+        "NeverDoneOverYourQuestion: a question to the owner is open; the owner answers it or queues it to the lead"
+      ],
+      "reviewRevision": "b45d012de20656eb36b0273d1f123153d97a4b00d7bc463c2ed3c4843ce792f4",
+      "messages": [
+        {
+          "kind": "owner-ask",
+          "at": "2026-11-10T13:00:44.844Z",
+          "by": "worker-ux",
+          "text": "Which tab opens first?",
+          "deliveries": []
+        }
+      ],
+      "deliveries": [],
+      "undelivered": 0
+    },
+    {
+      "id": 8,
+      "title": "Poll the board file",
+      "status": "claimed",
+      "role": "backend-worker",
+      "tag": "server",
+      "owner": "worker-backend",
+      "route": null,
+      "gated": true,
+      "accept": "Poll the board file works",
+      "archived": false,
+      "after": [],
+      "waitsOn": [],
+      "claimedAt": "2026-11-10T13:00:44.710Z",
+      "heartbeatAt": null,
+      "lastSignalAt": "2026-11-10T13:00:44.710Z",
+      "silent": false,
+      "doneAt": null,
+      "closedAt": null,
+      "wake": null,
+      "leadWake": null,
+      "run": null,
+      "evidenceCount": 0,
+      "ownerThread": {
+        "question": "NoAsk",
+        "note": "NoteQueued"
+      },
+      "doneBlockers": [
+        "NeverDoneUnchecked: no evidence",
+        "NeverDoneUnconfirmed: no confirmed check or accept for the current evidence",
+        "NeverDoneOverNote: the owner queued a note to the lead; the lead reads it (note-read) and replies (lead-reply)"
+      ],
+      "reviewRevision": "d0130fe0ba50cd801a3e5b17719727c9386721ef75b54d49c24b61b292874f35",
+      "messages": [
+        {
+          "kind": "note",
+          "at": "2026-11-10T13:00:45.760Z",
+          "by": "worker-backend",
+          "text": "The poller is done",
+          "deliveries": [
+            {
+              "id": "8-d1",
+              "entryKind": "note",
+              "entryAt": "2026-11-10T13:00:45.760Z",
+              "audience": {
+                "kind": "lead"
+              },
+              "attempts": 0,
+              "state": "unaddressed",
+              "since": "2026-11-10T13:00:45.760Z",
+              "reason": "the board has no lead address"
+            }
+          ]
+        }
+      ],
+      "deliveries": [
+        {
+          "id": "8-d1",
+          "entryKind": "note",
+          "entryAt": "2026-11-10T13:00:45.760Z",
+          "audience": {
+            "kind": "lead"
+          },
+          "attempts": 0,
+          "state": "unaddressed",
+          "since": "2026-11-10T13:00:45.760Z",
+          "reason": "the board has no lead address"
+        }
+      ],
+      "undelivered": 1
+    },
+    {
+      "id": 9,
+      "title": "Check the filters",
+      "status": "claimed",
+      "role": "qa-worker",
+      "tag": "verify",
+      "owner": "/root/study_runtime_qa",
+      "route": null,
+      "gated": true,
+      "accept": "Check the filters works",
+      "archived": false,
+      "after": [],
+      "waitsOn": [],
+      "claimedAt": "2026-11-10T13:00:44.776Z",
+      "heartbeatAt": null,
+      "lastSignalAt": "2026-11-10T13:00:44.776Z",
+      "silent": false,
+      "doneAt": null,
+      "closedAt": null,
+      "wake": null,
+      "leadWake": null,
+      "run": null,
+      "evidenceCount": 0,
+      "ownerThread": {
+        "question": "NoAsk",
+        "note": "NoNote"
+      },
+      "doneBlockers": [
+        "NeverDoneUnchecked: no evidence",
+        "NeverDoneUnconfirmed: no confirmed check or accept for the current evidence"
+      ],
+      "reviewRevision": "6fe0ab92e22c8e3d674a4df75249e2f93cdad024fd2e0d8d9dace4dc5bef6300",
+      "messages": [],
+      "deliveries": [],
+      "undelivered": 0
+    }
+  ],
+  "closed": {
+    "limit": 2,
+    "tasks": [
+      {
+        "id": 14,
+        "title": "Retired experiment 3",
+        "status": "cancelled",
+        "role": "qa-worker",
+        "tag": "old",
+        "owner": null,
+        "route": null,
+        "gated": true,
+        "accept": "Retired experiment 3 works",
+        "archived": false,
+        "after": [],
+        "waitsOn": [],
+        "claimedAt": null,
+        "heartbeatAt": null,
+        "lastSignalAt": null,
+        "silent": false,
+        "doneAt": null,
+        "closedAt": "2026-11-10T13:00:45.693Z",
+        "wake": null,
+        "leadWake": null,
+        "run": null,
+        "evidenceCount": 0,
+        "ownerThread": {
+          "question": "NoAsk",
+          "note": "NoNote"
+        },
+        "doneBlockers": [
+          "NeverDoneUnchecked: no evidence",
+          "NeverDoneUnconfirmed: no confirmed check or accept for the current evidence"
+        ],
+        "reviewRevision": "85a16e6b00d5014117e044fcde3f96544ab5e0b368f16691a7769814d5087aa3",
+        "messages": [],
+        "deliveries": [],
+        "undelivered": 0
+      },
+      {
+        "id": 13,
+        "title": "Retired experiment 2",
+        "status": "cancelled",
+        "role": "qa-worker",
+        "tag": "old",
+        "owner": null,
+        "route": null,
+        "gated": true,
+        "accept": "Retired experiment 2 works",
+        "archived": false,
+        "after": [],
+        "waitsOn": [],
+        "claimedAt": null,
+        "heartbeatAt": null,
+        "lastSignalAt": null,
+        "silent": false,
+        "doneAt": null,
+        "closedAt": "2026-11-10T13:00:45.549Z",
+        "wake": null,
+        "leadWake": null,
+        "run": null,
+        "evidenceCount": 0,
+        "ownerThread": {
+          "question": "NoAsk",
+          "note": "NoNote"
+        },
+        "doneBlockers": [
+          "NeverDoneUnchecked: no evidence",
+          "NeverDoneUnconfirmed: no confirmed check or accept for the current evidence"
+        ],
+        "reviewRevision": "93e75de0d494c9e551b7562400c4a73df8c7e3caa5cc421cfefa846fdd679709",
+        "messages": [],
+        "deliveries": [],
+        "undelivered": 0
+      }
+    ],
+    "next": "1794315645549:13"
+  },
+  "needsOwner": [
+    {
+      "id": 7,
+      "title": "Draw the column heads",
+      "status": "claimed",
+      "reasons": [
+        {
+          "why": "question",
+          "text": "Which tab opens first?",
+          "by": "worker-ux",
+          "at": "2026-11-10T13:00:44.844Z"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Poll the board file",
+      "status": "claimed",
+      "reasons": [
+        {
+          "why": "delivery",
+          "id": "8-d1",
+          "entryKind": "note",
+          "state": "unaddressed",
+          "detail": "the board has no lead address",
+          "at": "2026-11-10T13:00:45.760Z"
+        }
+      ]
+    }
+  ],
+  "withLead": [
+    {
+      "id": 8,
+      "title": "Poll the board file",
+      "status": "claimed",
+      "question": "NoAsk",
+      "note": "NoteQueued",
+      "text": "The poller is done",
+      "at": "2026-11-10T13:00:45.760Z"
+    }
+  ]
+}

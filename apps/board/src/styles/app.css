@@ -1,0 +1,628 @@
+@import 'tailwindcss';
+@import '../thread/thread.css';
+@import './moves.css';
+
+/*
+  The board is a working surface read at a desk and on a phone, so it is plain on purpose: one system type voice,
+  tone and a self-coloured edge instead of shadows, and one warm-brick attention colour on a green-grey field.
+  Light is a sage-tinted off-white; dark is a green-black. Both follow the device.
+*/
+:root {
+  color-scheme: light dark;
+  --gutter: 16px;
+  --touch: 44px;
+
+  --field: #e8eee5;
+  --surface: #f1f5ee;
+  --card: #f9fbf7;
+  --ink: #15211a;
+  --muted: #4f6155;
+  --edge: rgb(21 33 26 / 0.16);
+  --accent: #2b6845;
+  --tone: rgb(43 104 69 / 0.1);
+  --attention: #983826;
+  --attention-tone: rgb(152 56 38 / 0.1);
+  --attention-edge: rgb(152 56 38 / 0.34);
+  --changed: rgb(43 104 69 / 0.24);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --field: #0c1310;
+    --surface: #111a15;
+    --card: #17231b;
+    --ink: #e2ebe4;
+    --muted: #92a597;
+    --edge: rgb(226 235 228 / 0.16);
+    --accent: #88c9a0;
+    --tone: rgb(136 201 160 / 0.12);
+    --attention: #eb9782;
+    --attention-tone: rgb(235 151 130 / 0.12);
+    --attention-edge: rgb(235 151 130 / 0.36);
+    --changed: rgb(136 201 160 / 0.26);
+  }
+}
+
+html {
+  background: var(--field);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* iOS: tie the root size to the phone's Dynamic Type setting, so every rem on the page follows it. */
+@supports (font: -apple-system-body) {
+  html {
+    font: -apple-system-body;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--field);
+  line-height: 1.4;
+  overflow-wrap: break-word;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- page frame ---------- */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.app > .board {
+  flex: 1;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 20px;
+  padding: 16px var(--gutter) 10px;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.3125rem;
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: 0.005em;
+}
+
+.status,
+.build {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.status[data-state='stale'],
+.build [data-behind='behind'] {
+  color: var(--attention);
+  font-weight: 600;
+}
+
+.status svg,
+.build svg,
+.mark svg,
+.reason svg,
+.owner svg,
+.button svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+/* ---------- filters ---------- */
+
+.controls {
+  display: grid;
+  gap: 8px;
+  padding: 0 var(--gutter) 12px;
+}
+
+.search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.fields {
+  display: none;
+  gap: 8px;
+}
+
+.fields[data-open='true'] {
+  display: grid;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.input,
+.select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--touch);
+  padding: 0 12px;
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.input::placeholder {
+  color: var(--muted);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--touch);
+  padding: 0 16px;
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:active {
+  background: var(--tone);
+}
+
+@media (hover: hover) {
+  .button:hover {
+    background: var(--tone);
+  }
+}
+
+.button[data-wide='true'] {
+  width: 100%;
+}
+
+/* ---------- column switcher (phone and tablet) ---------- */
+
+.tabs {
+  display: grid;
+  /* Six tracks: three tabs across the first row and two wider ones under them, so no row ends in a hole. */
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+  padding: 0 var(--gutter) 12px;
+}
+
+.tab {
+  grid-column: span 2;
+}
+
+.tab:nth-child(n + 4) {
+  grid-column: span 3;
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-height: 48px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.tab[aria-selected='true'] {
+  background: var(--card);
+  border-color: var(--edge);
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.tab-count {
+  font-size: 1.0625rem;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.tab[data-attention='true'] .tab-count {
+  color: var(--attention);
+}
+
+/* ---------- banner ---------- */
+
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 var(--gutter) 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--attention-edge);
+  border-radius: 12px;
+  background: var(--attention-tone);
+  font-size: 0.9375rem;
+}
+
+.banner p {
+  flex: 1 1 14rem;
+  margin: 0;
+}
+
+/* ---------- columns ---------- */
+
+.board {
+  min-width: 0;
+  padding: 0 var(--gutter) 28px;
+}
+
+.column {
+  display: none;
+  min-width: 0;
+}
+
+.column[data-active='true'] {
+  display: block;
+}
+
+.column-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  padding: 12px 12px 8px;
+  font-size: 0.9375rem;
+  font-weight: 650;
+}
+
+.column-head .num {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  align-content: start;
+}
+
+.group-title {
+  margin: 12px 2px 0;
+  font-size: 0.875rem;
+  font-weight: 650;
+  color: var(--muted);
+}
+
+.empty {
+  margin: 8px 2px;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+/* ---------- cards ---------- */
+
+.card {
+  position: relative;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--ink) 11%, transparent);
+  border-radius: 12px;
+  background: var(--card);
+  /* Offscreen cards are skipped by layout and paint: 1,300 closed cards stay cheap. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 164px;
+}
+
+.card[data-attention='true'] {
+  border-color: var(--attention-edge);
+}
+
+@media (hover: hover) {
+  .card:hover {
+    background: color-mix(in srgb, var(--card), var(--ink) 4%);
+  }
+}
+
+.card-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* The whole card is the link: a stretched target with room well past 44 px. */
+.card-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+/* Paint containment clips at the card edge, so the focus ring sits inside it. */
+.card-link:focus-visible {
+  outline: none;
+}
+
+.card-link:focus-visible::after {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+
+.card-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.card-id {
+  color: var(--ink);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.card-age {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.card-title {
+  display: -webkit-box;
+  margin: 4px 0 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.38;
+  overflow-wrap: anywhere;
+}
+
+.owner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 6px;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+}
+
+.owner span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marks,
+.reasons {
+  display: grid;
+  gap: 3px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+}
+
+.mark,
+.reason {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.mark svg,
+.reason svg {
+  margin-top: 0.2em;
+}
+
+.mark[data-tone='attention'],
+.reason[data-tone='attention'] {
+  color: var(--attention);
+  font-weight: 600;
+}
+
+.reason-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow-wrap: anywhere;
+}
+
+/* A card that just changed settles from a tint back to its own tone. Content is visible throughout. */
+@keyframes settle {
+  from {
+    background-color: var(--changed);
+  }
+  to {
+    background-color: var(--card);
+  }
+}
+
+.card[data-changed='true'] {
+  animation: settle 2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card[data-changed='true'] {
+    animation: none;
+    background-color: var(--changed);
+  }
+}
+
+/* ---------- task stub ---------- */
+
+.page {
+  max-width: 44rem;
+  padding: 16px var(--gutter) 40px;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--touch);
+  color: var(--muted);
+  font-size: 0.9375rem;
+  text-decoration: none;
+}
+
+.back svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ---------- desktop: every column side by side ---------- */
+
+@media (min-width: 1024px) {
+  .app {
+    height: 100dvh;
+  }
+
+  .app > .board {
+    min-height: 0;
+  }
+
+  .header {
+    padding-top: 14px;
+  }
+
+  /* Search and the three filters wrap instead of forcing the page wider: at 200% text they no longer fit one row. */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: start;
+  }
+
+  .search-row {
+    flex: 1 1 16rem;
+    max-width: 24rem;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .filter-toggle {
+    display: none;
+  }
+
+  .fields,
+  .fields[data-open='false'] {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(9rem, 12rem));
+  }
+
+  .field span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .tabs {
+    display: none;
+  }
+
+  .board {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    min-height: 0;
+    padding-bottom: 16px;
+  }
+
+  /* `[data-active]` matches the phone rule's weight, so the selected column is a bounded flex column here too. */
+  .column,
+  .column[data-active] {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid color-mix(in srgb, var(--ink) 9%, transparent);
+    border-radius: 14px;
+    background: var(--surface);
+  }
+
+  .list {
+    flex: 1;
+    min-height: 0;
+    padding: 0 10px 10px;
+    overflow-y: auto;
+  }
+}
+
+/* Phone and tablet: the tab names the column, so its heading is for screen readers only. */
+@media (max-width: 1023.98px) {
+  .column-head {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023.98px) {
+  .tabs {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .tab,
+  .tab:nth-child(n + 4) {
+    grid-column: auto;
+  }
+
+  .fields[data-open='true'] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "@derek-skills/board",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "HOST=127.0.0.1 PORT=4788 vite dev --host 127.0.0.1 --port 4788",
+    "build": "vite build",
+    "start": "HOST=127.0.0.1 PORT=${PORT:-4788} bun .output/server/index.mjs",
+    "test": "vitest run --config vitest.config.ts",
+    "test:browser": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "^1.170.46",
+    "@tanstack/react-start": "^1.169.4",
+    "arktype": "^2.2.9",
+    "lucide-react": "^1.61.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/nitro-v2-vite-plugin": "^1.155.2",
+    "@types/node": "^24",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.1.0"
+  }
+}

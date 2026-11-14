@@ -1,0 +1,25 @@
+{
+  "name": "derek-skills",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:jev": "vitest run scripts/jev-",
+    "test:team-tasks": "vitest run scripts/team-tasks",
+    "test:board": "vitest run scripts/team-board scripts/team-review scripts/team-tasks",
+    "test:app": "cd apps/board && bun run test",
+    "board:dev": "cd apps/board && bun run dev"
+  },
+  "dependencies": {
+    "@typesafe-ai/sdk": "^0.7.0",
+    "arktype": "^2.2.9"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

@@ -1,0 +1,536 @@
+/*
+  Moving cards. Same voice as the rest of the board: tone and a self-coloured edge, no glow, no hover lift. A held
+  card is the card itself, lifted by a slightly larger scale and an accent edge; the columns it can land in take the
+  accent edge, the ones it cannot go dim and say why.
+*/
+
+/* ---------- the card and its two buttons ---------- */
+
+.card[data-movable='true'] {
+  cursor: grab;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.card-actions {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* The card's link is stretched over the whole card; the buttons sit above it. */
+.button.card-action {
+  position: relative;
+  z-index: 1;
+  min-height: var(--touch);
+  padding: 0 12px;
+  font-size: 0.875rem;
+}
+
+.button.card-action:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+.card-cleared {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+/*
+  A desktop with a mouse drags cards, so the two buttons stop costing every card a row: icon-sized, they wait in the
+  card's lower right corner and show when the card is pointed at or has focus. A phone keeps them as a row.
+*/
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .card {
+    contain-intrinsic-size: auto 112px;
+  }
+
+  .card-actions {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    z-index: 1;
+    gap: 4px;
+    margin: 0;
+    opacity: 0;
+  }
+
+  .card:hover .card-actions,
+  .card:focus-within .card-actions {
+    opacity: 1;
+  }
+
+  .button.card-action {
+    min-height: 32px;
+    padding: 0 8px;
+    background: var(--card);
+  }
+
+  .card-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+.card[data-dragging='true'] {
+  border-style: dashed;
+  border-color: var(--accent);
+  opacity: 0.5;
+}
+
+/* ---------- the held card ---------- */
+
+.card.drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  margin: 0;
+  box-sizing: border-box;
+  content-visibility: visible;
+  pointer-events: none;
+  border-color: var(--accent);
+  background: var(--card);
+  scale: 1.025;
+  /* One tight shadow from above, tinted to the ink: it says "lifted" and nothing else. */
+  box-shadow: 0 3px 5px color-mix(in srgb, var(--ink) 16%, transparent);
+  animation: lift 120ms ease-out;
+}
+
+@keyframes lift {
+  from {
+    scale: 1;
+    box-shadow: 0 0 0 color-mix(in srgb, var(--ink) 0%, transparent);
+  }
+}
+
+.drag-ghost .card-actions {
+  visibility: hidden;
+}
+
+body[data-dragging='true'],
+body[data-dragging='true'] * {
+  cursor: grabbing;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ---------- where it can land ---------- */
+
+.column[data-drop='legal'] {
+  border-radius: 14px;
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
+
+.column[data-drop='legal'][data-over='true'] {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  outline-style: solid;
+}
+
+.column[data-drop='refused'],
+.column[data-drop='none'] {
+  border-radius: 14px;
+  opacity: 0.55;
+}
+
+.column[data-drop='refused'][data-over='true'] {
+  outline: 2px solid var(--attention-edge);
+  outline-offset: -2px;
+}
+
+.drop-reason {
+  margin: 0 12px 8px;
+  color: var(--attention);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.tab[data-drop='legal'] {
+  border: 1px dashed var(--accent);
+  color: var(--ink);
+}
+
+.tab[data-drop='legal'][data-over='true'] {
+  border-style: solid;
+  background: color-mix(in srgb, var(--accent) 14%, var(--card));
+}
+
+.tab[data-drop='refused'],
+.tab[data-drop='none'] {
+  opacity: 0.55;
+}
+
+.tab[data-drop='refused'][data-over='true'] {
+  border: 1px solid var(--attention-edge);
+}
+
+/* ---------- column tools ---------- */
+
+.column-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 0 8px;
+}
+
+.button.column-tool {
+  min-height: var(--touch);
+  padding: 0 12px;
+  font-size: 0.875rem;
+}
+
+.column-tool[aria-pressed='true'] {
+  border-color: var(--accent);
+}
+
+.column-tool-count {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* ---------- the sheet ---------- */
+
+dialog.sheet {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 30rem;
+  max-height: 88dvh;
+  margin: auto auto 0;
+  padding: 0;
+  border: 1px solid var(--edge);
+  border-radius: 16px 16px 0 0;
+  background: var(--surface);
+  color: var(--ink);
+  overflow: hidden;
+}
+
+/* On a wide screen it floats in the middle: a sheet stuck to the bottom edge of a desktop window looks cut off. */
+@media (min-width: 640px) {
+  dialog.sheet {
+    margin: auto;
+    border-radius: 16px;
+  }
+}
+
+dialog.sheet::backdrop {
+  background: rgb(12 19 16 / 0.5);
+}
+
+dialog.sheet[open] {
+  animation: sheet-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes sheet-in {
+  from {
+    translate: 0 28px;
+  }
+}
+
+.sheet-panel {
+  position: relative;
+  max-height: 88dvh;
+  padding: 20px var(--gutter) calc(20px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+
+.sheet-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: var(--touch);
+  height: var(--touch);
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.sheet-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.sheet-title {
+  margin: 0 var(--touch) 4px 0;
+  font-size: 1.125rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.sheet-sub {
+  display: -webkit-box;
+  margin: 0 0 12px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  color: var(--muted);
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+.sheet-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  background: var(--card);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sheet-row svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+
+@media (hover: hover) {
+  .sheet-row[data-state='legal']:hover {
+    background: var(--tone);
+  }
+}
+
+.sheet-row[data-state='legal']:active {
+  background: var(--tone);
+}
+
+.sheet-row[data-state='refused'] {
+  border-style: dashed;
+  background: transparent;
+  cursor: not-allowed;
+}
+
+.sheet-row[data-state='refused'] .sheet-row-label {
+  color: var(--muted);
+}
+
+.sheet-row[data-state='refused'] .sheet-row-note {
+  color: var(--attention);
+  font-weight: 600;
+}
+
+.sheet-row[data-state='here'] {
+  border-color: var(--accent);
+  background: var(--tone);
+  cursor: default;
+}
+
+.sheet-row-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sheet-row-label {
+  font-weight: 650;
+}
+
+.sheet-row-note {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.sheet-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.input.sheet-input {
+  min-height: 5rem;
+  padding: 10px 12px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.sheet-consequence {
+  margin: 0 0 12px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.sheet-error {
+  margin: 8px 0 0;
+  color: var(--attention);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* Both actions share one shape; the one that does the thing takes the accent edge and ink. */
+.sheet-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.sheet-actions .button[data-primary='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---------- what floats over the board ---------- */
+
+.drag-layer {
+  position: fixed;
+  right: 0;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  left: 0;
+  z-index: 50;
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  padding: 0 var(--gutter);
+  pointer-events: none;
+}
+
+.notice,
+.dock {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 36rem;
+  border: 1px solid var(--edge);
+  border-radius: 14px;
+  background: var(--card);
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 4px 14px;
+  font-size: 0.9375rem;
+  pointer-events: auto;
+  animation: notice-in 160ms ease-out;
+}
+
+.notice p {
+  flex: 1;
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+}
+
+.notice[data-tone='error'] {
+  border-color: var(--attention-edge);
+  background: color-mix(in srgb, var(--attention) 10%, var(--card));
+}
+
+@keyframes notice-in {
+  from {
+    translate: 0 8px;
+  }
+}
+
+.notice-close {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--touch);
+  height: var(--touch);
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.notice-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+.dock {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 8px 8px 14px;
+}
+
+.dock-line {
+  margin: 0;
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.dock-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 2px dashed var(--edge);
+  border-radius: 10px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  pointer-events: auto;
+}
+
+.dock-clear svg {
+  width: 16px;
+  height: 16px;
+}
+
+.dock-clear[data-drop='legal'] {
+  border-color: var(--accent);
+}
+
+.dock-clear[data-drop='legal'][data-over='true'] {
+  border-style: solid;
+  background: color-mix(in srgb, var(--accent) 14%, var(--card));
+}
+
+.dock-clear[data-drop='refused'] {
+  opacity: 0.55;
+}
+
+.dock-clear[data-drop='refused'][data-over='true'] {
+  border-color: var(--attention-edge);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card.drag-ghost {
+    animation: none;
+  }
+
+  dialog.sheet[open],
+  .notice {
+    animation: none;
+  }
+}
