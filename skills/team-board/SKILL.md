@@ -1,6 +1,6 @@
 ---
 name: team-board
-description: Operate the shared team task board (team-tasks.mjs): add, claim, heartbeat, evidence, decide, route, done, ask-owner, reviews, archive, doctor and repair. Load when reading or changing board state, or when a board command or healing message needs interpreting.
+description: "Operate the shared team task board (team-tasks.mjs): add, claim, heartbeat, evidence, decide, route, done, ask-owner, reviews, archive, doctor and repair. Load when reading or changing board state, or when a board command or healing message needs interpreting."
 ---
 
 # Team task board

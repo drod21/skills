@@ -29,9 +29,11 @@ threshold and deferred-finding rules in the coordinator's
    number or worktree name alone does not select its contents.
 2. Prefer the already assigned review worktree when its HEAD matches the
    candidate. Preserve unrelated dirty work. Create another worktree only within
-   explicit authorization; never repurpose an author's active checkout. Write the
-   PR diff to a file (excluding generated snapshots), read it in chunks and return
-   a files-reviewed log whose count matches the PR file count.
+   explicit authorization; never repurpose an author's active checkout. A request
+   to set up this workflow does not itself request a new worktree or launch a
+   review. Write the PR diff to a file (excluding generated snapshots), read it
+   in chunks and return a files-reviewed log whose count matches the PR file
+   count.
 3. Use the harness's delegation tool with worktree isolation for a requested
    separate checkout, and verify the child's actual HEAD: its initial parent
    commit may differ from the PR head. For a helper that needs no separate

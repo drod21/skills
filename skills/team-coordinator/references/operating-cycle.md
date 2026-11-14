@@ -40,12 +40,13 @@ stopped lead needs an explicit recovery handoff under the claim-reassignment rul
    still requires explicit authorization. After a merge, match CI runs to the
    merge commit SHA and triage failures from the full job log, not its excerpt;
    when the log does not show the failure, read the check-run annotations for file,
-   line and message. Merge in windows: after a merge, hold the next one until the
-   default branch's verification run for that commit completes. Judge each
-   workflow by its latest completed run; a run cancelled by a newer push gives no
-   verdict. In a sharded job, find every shard's result in the full log, not the
-   trailing summary. Check the merge commit's runs yourself once they finish; do
-   not wait for the owner to notice red.
+   line and message.    Merge in windows: after a merge, hold the next one until the
+   default branch's verification run for that commit completes. Before staging a
+   release, require one completed green verification run at the frozen head.
+   Judge each workflow by its latest completed run; a run cancelled by a newer
+   push gives no verdict. In a sharded job, find every shard's result in the full
+   log, not the trailing summary. Check the merge commit's runs yourself once
+   they finish; do not wait for the owner to notice red.
 4. **Prepare.** Leads self-review against applicable preferences and assemble the
    packet below. The chief of staff resolves anything already authorized,
    combines duplicate decisions and sends only genuinely human work to the queue.

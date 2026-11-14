@@ -1,6 +1,6 @@
 ---
 name: poteto-lite
-description: Work in poteto's style: restate the goal first, smallest change that meets it, deliberate fresh subagents, proof against the real artifact, unslopped prose. Use when asked for poteto mode, poteto lite, /poteto-lite, or when a delegation brief should open with it.
+description: "Work in poteto's style: restate the goal first, smallest change that meets it, deliberate fresh subagents, proof against the real artifact, unslopped prose. Use when asked for poteto mode, poteto lite, /poteto-lite, or when a delegation brief should open with it."
 disable-model-invocation: true
 ---
 

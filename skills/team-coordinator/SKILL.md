@@ -85,8 +85,10 @@ tool approvals. The actual tool-approval holder still controls approval.
    **route** is the executor recommendation, **owner** is a unique agent ID. A
    role is not a model, and a skill supplies instructions without creating an agent.
 3. Inspect the board with `list`, `show <id>`, `stale` or `doctor` (none writes).
-   Never reset an existing board. Worktrees share the main checkout's
-   `tasks.json`, which is gitignored; a copied board is a different board.
+   Filters are `--status`, `--role` and `--tag`. The first mutating command creates
+   an absent board. Never reset an existing board. Worktrees share the main
+   checkout's `tasks.json`, which is gitignored; a copied board is a different
+   board.
 4. When Jev is configured, judge a task (Node 22.18+, needs `TYPESAFE_API_KEY`,
    calls an external service, so keep keys and private artifacts out of titles
    and briefs):
@@ -98,13 +100,15 @@ tool approvals. The actual tool-approval holder still controls approval.
 
    Jev judges scope, subtlety, mechanical fit, risk, open decision, owner and
    proof; code maps scope and subtlety to a route, then picks an executor within
-   it. Inspect `holds`, `roleFits`, `suggestedRole`, `check` and `reasons`, not
-   only `route`. `--add` adds the task under Jev's suggested role when Jev is
-   confident the submitted role does not fit. `--task <id>` reads title, role and
-   `after` from the board and stores the verdict (do not pass a title, `--role` or
-   `--after` with it; `--brief` is fine). It refuses a done or cancelled task and
-   does not lift `needs_lead` or replace a route a lead set. A missing key or
-   service is an unavailable check, not permission to invent a result.
+   it. An uncertain score widens the executor instead of holding, so `needs_lead`
+   means a `risky` or `needs_decision` hold. Inspect `holds`, `roleFits`,
+   `suggestedRole`, `check` and `reasons`, not only `route`. `--add` adds the
+   task under Jev's suggested role when Jev is confident the submitted role does
+   not fit. `--task <id>` reads title, role and `after` from the board and stores
+   the verdict (do not pass a title, `--role` or `--after` with it; `--brief` is
+   fine). It refuses a done or cancelled task and does not lift `needs_lead` or
+   replace a route a lead set. A missing key or service is an unavailable check,
+   not permission to invent a result.
 5. Add ready tasks with their approved role and route, using returned IDs for
    dependencies, title before flags:
 
@@ -117,10 +121,14 @@ tool approvals. The actual tool-approval holder still controls approval.
 
    Every role except `lead` needs `--accept` (at most 600 characters). `--tag <t>`
    is an optional team label (lowercase letters, digits, hyphens). A team or
-   project name is a tag, never a role. Never dispatch `needs_lead` or unresolved
-   holds. Resolve a hold with `route <id> <route> --reason "..."` once decided.
-   Re-plan a task blocked by a cancelled dependency with `after <id> <id,id|none>`.
-   There is no block command, and never bypass a hold by adding a duplicate.
+   project name is a tag, never a role. A role that is not in the catalog is
+   refused, and the error names the catalog; a stored off-catalog role stays
+   claimable. Never dispatch `needs_lead` or unresolved holds. Resolve a hold
+   with `route <id> <route> --reason "..."` once decided. `add --reason` needs
+   `--route`, and `add --by` needs a journaled decision. `--ref` and `--by` are
+   trimmed, and a blank value is refused. Re-plan a task blocked by a cancelled
+   dependency with `after <id> <id,id|none>`. There is no block command, and never
+   bypass a hold by adding a duplicate.
 
 ## Tests first
 
@@ -259,13 +267,16 @@ overwrites the global wake. Immediately after a delegation returns, run
 On a task with `accept`, workers ask Jev themselves with `jev-ask.ts --task <id>
 --by <owner>` (`--preset flaky_or_real|blocker_or_nit|clipped_text`, `--pick` for a
 two-to-four label choice) and `jev-decide.ts --task <id> --by <owner>` for scored
-options; `jev-ask.ts --check-evidence` is the last Jev call before `done`. The
-lead resolves a hold with `decide` and uses `accept <id> --reason <text> --by
+options; `jev-ask.ts --check-evidence` is the last Jev call before `done`. Before
+invoking a bounded wrapper that writes results, create and verify its task-owned
+output directory. Helper subagents pass `--out <dir>` and do not write the board.
+The lead resolves a hold with `decide` and uses `accept <id> --reason <text> --by
 <lead>` only when that check holds. `done` refuses while `doneBlockers` is not
-empty and `--force` does not skip it. The gate is a protocol gate, not a
-tamper-proof one. Nothing secret goes to Jev: credential files are never read,
-token-shaped text is refused, and at most 12 evidence items (4 images, each side
-280 to 1568 pixels) are sent; resize with `sips -Z 1568`.
+empty and `--force` does not skip it. On a gated task, only the claim owner
+records a judgment. The gate is a protocol gate, not a tamper-proof one. Nothing
+secret goes to Jev: credential files are never read, token-shaped text is refused,
+and at most 12 evidence items (4 images, each side 280 to 1568 pixels) are sent;
+resize with `sips -Z 1568`.
 
 A question only the owner can answer goes on the task, not into chat: `ask-owner
 <id> <question...> --by <name>` on a claimed task, one open at a time; file each
@@ -275,9 +286,12 @@ read with `note-read`, answers with `lead-reply <id> <reply...> --by <lead>` (wh
 starts no turn; follow it with a message to the lead's worker), and the worker
 acknowledges with `answer-read`. `inbox` lists who owes the next move: check it at
 the start of every lead turn. `done` refuses while a question, unread answer,
-handed question or note is open. Only the owner answers, and `answer --by` must
-differ from the claim owner and the asker. If the owner answers in chat, that is
-the answer: record it with `decide <id> --summary --ref <chat>` and go on.
+handed question or note is open. `cancel` refuses while the owner's note is
+unread, and `archive` keeps a task whose note is unanswered. Only the owner
+answers, and `answer --by` must differ from the claim owner and the asker. A note
+that reopens a finished task voids every earlier judgment, like a release, so the
+next claim needs a fresh check. If the owner answers in chat, that is the answer:
+record it with `decide <id> --summary --ref <chat>` and go on.
 
 Track both agent status and board status. A failed or cancelled worker leaves its
 claim intact. To replace one, confirm the old executor stopped, pause board users,
@@ -382,13 +396,36 @@ Selection, filtering and progress patterns, all within the authorized task:
   tools, then take fresh evidence; never invent a selector or reuse a target after
   the screen changes.
 - **Check progress before repeating an action.** Compare goal, before/after state
-  and recent actions. When an action repeats without progress or Jev is unsure,
-  inspect the state and return the judgment to the lead. Jev's choice never
-  authorizes an external action.
-- **Select context before summarizing, filter large evidence, batch related
-  judgments.** Use `jev-select.ts` (filter or compact) and `jev-batch.ts`; they
-  retain complete bounded inputs and split requests instead of tail-truncating.
-  Semantic content judgments are editorial evidence, not measured rankings.
+  and recent actions. Use bounded questions or choices to distinguish completion,
+  ambiguity, an error, a blocker and no progress. Confirm observable completion
+  directly. When an action repeats without progress or Jev is unsure, inspect the
+  state and return the judgment to the lead. Jev's choice never authorizes an
+  external action.
+- **Select context before summarizing.** Pin user constraints, authorization,
+  accepted decisions, active work, blockers and evidence references first. Give
+  remaining transcript sections stable IDs and ask whether each contains facts
+  needed for the current goal. Keep uncertain or unjudged sections. The lead
+  writes the summary of sections selected for compression and preserves the
+  original artifacts. Check that concrete facts from compressed sections can still
+  be recovered from the summary plus retained context.
+- **Filter large evidence by relevance.** Split long research pages,
+  documentation or logs into identified sections with source URLs or paths and
+  offsets. Ask which sections help answer the actual task question. Return
+  original excerpts in source order, record omitted section IDs and reasons, and
+  retain the full artifact. Keep uncertain sections; a filtered excerpt is not
+  proof that the full source contains no other evidence.
+- **Evaluate content meaning.** For website or content work already in scope,
+  provide the intended audience, search intent, page text and concrete criteria.
+  Ask whether headings match the body and whether the page answers its intended
+  question. The agent writes revisions; code checks metadata, links and schema.
+  Semantic judgments are editorial evidence, not measured rankings. Apply the
+  review threshold to proposed fixes.
+- **Batch related judgments.** Prefer one bounded state with multiple typed
+  questions over re-sending the same artifact for each question. Use
+  `jev-batch.ts` for multiple questions and `jev-select.ts` for filtering or
+  compaction selection; they retain complete bounded inputs and split requests
+  instead of tail-truncating. `jev-ui.ts` supplies a bounded action protocol and
+  `runUiFlow` runs observe/choose/act/verify through supplied harness adapters.
 
 Details and input formats: [execution tools](references/jev-execution.md).
 

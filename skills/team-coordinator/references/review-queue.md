@@ -63,7 +63,8 @@ field never activates those shortcuts; Ctrl/Command+Enter submits the visible
 draft; every action has a button; each item is submitted separately with no
 approve-all shortcut. Deferral is a durable note for the lead to reprioritize, not
 a timed snooze. Dictation leaves an editable transcript and never submits by
-itself.
+itself. Drafts survive polling and in-page item navigation, but are not persisted
+across full page reloads.
 
 Answers use `answer`; changes and deferrals use `note`. The viewer sends
 `--expected` to the locked board writer, which compares the displayed revision
