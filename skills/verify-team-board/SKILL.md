@@ -11,13 +11,13 @@ of the rules. Run from the toolkit root:
 
 ```bash
 cd "${DEREK_SKILLS:-$HOME/derek-skills}"
-bun run test:board                      # gate, thread, view, review suites
+pnpm test:board                         # gate, thread, view, review suites
 node scripts/verify-team-review.mjs     # bounded exhaustive scored-review check
 ```
 
 None of these need a network, a Jev key, a database or a live board: every board
 is in memory and the Jev provider is a fake. Run the narrower file while iterating
-(`bunx vitest run scripts/team-board-gate.test.ts`), then the whole set before
+(`pnpm exec vitest run scripts/team-board-gate.test.ts`), then the whole set before
 calling the change done.
 
 ## What each check owns
@@ -29,7 +29,7 @@ calling the change done.
 | The board read model (`boardView`, "needs you" sections, moves) | `team-board-view.test.ts`                          |
 | `team-review.mjs` parsing, review recording and completion | `team-review.test.ts` and `verify-team-review.mjs`          |
 | Run links, wake addresses, `doctor --runs`           | `team-tasks-runs.test.ts`, `team-tasks-runs-gone.test.ts`      |
-| Jev scripts                                          | `bun run test:jev`                                             |
+| Jev scripts                                          | `pnpm test:jev`                                                |
 
 The rules under test are listed in [jev-team](../team-coordinator/references/jev-team.md).
 

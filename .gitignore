@@ -1,0 +1,10 @@
+node_modules
+bun.lock
+tasks.json*
+**/*.result.json
+apps/board/.output
+apps/board/.nitro
+apps/board/.tanstack
+apps/board/test-results
+apps/board/dist
+.DS_Store

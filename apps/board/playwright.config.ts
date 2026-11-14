@@ -47,7 +47,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'bun run build && bun run start',
+      command: 'pnpm run build && pnpm run start',
       url: `${E2E_ORIGIN}/api/session`,
       reuseExistingServer: false,
       timeout: 120_000,
@@ -65,7 +65,7 @@ export default defineConfig({
     {
       // Built by the server above, which Playwright waits for first. Its own stand-in t3 and log, so no move can reach
       // a real thread and the two servers never share a send log.
-      command: 'bun run start',
+      command: 'pnpm run start',
       url: `${MOVES_ORIGIN}/api/session`,
       reuseExistingServer: false,
       timeout: 120_000,

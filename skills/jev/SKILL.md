@@ -18,7 +18,7 @@ TOOLKIT="${DEREK_SKILLS:-$HOME/derek-skills}"
 Run every script with **Node 22.18+** (not Bun: `@typesafe-ai/sdk` 0.7.0 throws
 "Body already used" on Bun 1.4.4). A live call needs `TYPESAFE_API_KEY` in the
 process; the scripts never print it, redact it in errors and refuse input that
-contains it. Install dependencies once with `bun install` in the toolkit.
+contains it. Install dependencies once with `pnpm install` in the toolkit.
 
 | Script             | Question it answers                                       | Detail                                                        |
 | ------------------ | --------------------------------------------------------- | ------------------------------------------------------------- |
@@ -54,5 +54,5 @@ no quality ranking), `team-catalog.mjs` (roles, routes, checks).
    and `--rescore` against saved results.
 
 Testing the scripts without a key: the vitest suite injects a fake provider
-(`bun run test:jev` in the toolkit). It checks request shape and plumbing, not
+(`pnpm test:jev` in the toolkit). It checks request shape and plumbing, not
 Jev's semantic accuracy.

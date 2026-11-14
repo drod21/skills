@@ -19,7 +19,7 @@ skills/<name>/SKILL.md one skill per directory (frontmatter: name, description)
 agents/*.md            Claude Code subagent definitions (adversary, call-sites, test-runner)
 scripts/               board + Jev scripts and their tests (Node 22.18+, ESM, flat)
 apps/board/            kanban web app over the board (TanStack Start, loopback only); own package.json
-bin/link-skills.sh     symlink skills and agents into a harness directory (dry run by default)
+bin/link-skills.sh     copy skills into a project's .agents and symlink .claude (dry run by default)
 ```
 
 Locate the toolkit with `TOOLKIT="${DEREK_SKILLS:-$HOME/derek-skills}"` and call
@@ -29,10 +29,12 @@ directory. Skill-to-skill links are relative (`../team-coordinator/SKILL.md`), s
 they resolve inside this repository; a symlinked skill that needs a sibling reads
 it from `$TOOLKIT/skills/`.
 
-Install: `bun install` once here, then `bin/link-skills.sh` to preview and
-`bin/link-skills.sh --apply` to link. It never overwrites an existing entry; a
-skill already installed under the same name (for example a `chief-of-staff` folder
-you already keep in `~/.agents/skills`) is skipped and reported.
+Install: `pnpm install` once here, then `bin/link-skills.sh PROJECT_DIR` to preview
+and `bin/link-skills.sh --apply PROJECT_DIR` to install. That copies each skill into
+`PROJECT_DIR/.agents/skills/` and tries a relative symlink from
+`PROJECT_DIR/.claude/skills/` to the matching `.agents` entry. It never overwrites
+an existing entry; a skill already installed under the same name is skipped and
+reported.
 
 ## Skills
 
@@ -118,11 +120,12 @@ The project provides, and the skills assume:
    the Jev scripts report an unavailable check and the process continues with lead
    judgment.
 
-Optional board app: from the project checkout, run
-`HOST=127.0.0.1 bun "$TOOLKIT/apps/board/.output/server/index.mjs"` after `bun install && bun run build` in
-`$TOOLKIT/apps/board` (dev: `bun run dev`, port 4788). It reads `./tasks.json` from the working directory
-(override `TEAM_TASKS_FILE`), runs the toolkit's `team-tasks.mjs`, and refuses any non-loopback bind. Writes need
-the session token; tailnet access is opt-in through `TEAM_BOARD_TAILNET_HOST` and `TEAM_BOARD_TAILNET_LOGINS`.
+Optional board app: from the toolkit root, `pnpm install` once, then `pnpm --filter @derek-skills/board build`
+and `pnpm --filter @derek-skills/board start` (or `pnpm board:dev` for Vite, port 4788). The default Nitro
+preset still needs the Bun runtime to serve `.output/server/index.mjs`. Run the server from the project
+checkout so it reads `./tasks.json` (override `TEAM_TASKS_FILE`); it shells out to the toolkit's
+`team-tasks.mjs` and refuses any non-loopback bind. Writes need the session token; tailnet access is
+opt-in through `TEAM_BOARD_TAILNET_HOST` and `TEAM_BOARD_TAILNET_LOGINS`.
 
 Optional adapters: T3 delegation (`t3_task` run links, `t3 thread` calls for wake
 and `doctor --runs`; binary override `TEAM_BOARD_T3_BIN`). A harness without T3
@@ -136,16 +139,19 @@ simply never uses those fields.
 - **Docs and code move together.** A rule documented in a skill and enforced by a
   script changes in one commit, with the test that pins it. The script's `--help`
   and the code win over prose when they disagree; fix the prose.
-- **Run Jev scripts with Node 22.18+**, not Bun. Tests inject a fake provider and
-  never call the real service or read credentials.
+- **Install with pnpm 12.11+** (`packageManager` pins 12.18). Do not commit `bun.lock`.
+  Agent skills from dependencies are linked via `pnpm-workspace.yaml` (`permissions` /
+  `skills.dirs`); run `pnpm approve` / `pnpm approve-builds` when install reports pending
+  items. Run Jev scripts with **Node 22.18+**, not Bun (`@typesafe-ai/sdk` breaks on Bun).
+  Tests inject a fake provider and never call the real service or read credentials.
 - **Verify before you claim.** Run the test suite for what you touched:
 
   ```bash
-  bun run test            # everything
-  bun run test:team-tasks # board library and CLI
-  bun run test:board      # gate, thread, view, review, delivery
-  bun run test:jev        # Jev scripts
-  bun run test:app        # kanban web app unit tests (needs `bun install` in apps/board)
+  pnpm test            # everything
+  pnpm test:team-tasks # board library and CLI
+  pnpm test:board      # gate, thread, view, review, delivery
+  pnpm test:jev        # Jev scripts
+  pnpm test:app        # kanban web app unit tests
   node scripts/verify-team-review.mjs
   ```
 

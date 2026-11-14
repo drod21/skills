@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+
+# Agent skills shipped by dependencies (pnpm >= 12.11).
+# https://pnpm.io/agent-skills
+permissions:
+  arktype:
+    skills: true
+skills:
+  dirs:
+    - .agents/skills

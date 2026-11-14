@@ -17,7 +17,7 @@ node "$TOOLKIT/scripts/team-tasks.mjs" --help
 ```
 
 The scripts import `arktype` from the toolkit's `node_modules`. On a fresh
-checkout run `bun install` once in `$TOOLKIT` first; without it the command
+checkout run `pnpm install` once in `$TOOLKIT` first; without it the command
 fails with `Cannot find package 'arktype'`.
 
 ## Where the board lives
@@ -153,5 +153,5 @@ review completion or how Jev judgments are recorded, run the checks in
 `apps/board` in the toolkit is a kanban view over the same board: columns, drag to move, an owner thread per
 task, and a settings page for the lead's thread. It shells out to `team-tasks.mjs`, so every rule above still
 applies; the UI cannot do anything the CLI refuses. Start it from the project checkout (see `AGENTS.md`,
-"Using the toolkit in a project"). Browser checks: `cd apps/board && bun run test:browser`; they are time-sensitive
+"Using the toolkit in a project"). Browser checks: `pnpm --filter @derek-skills/board test:browser`; they are time-sensitive
 and flake on a loaded host, so rerun a failing spec alone before treating it as a regression.
