@@ -19,7 +19,8 @@ absolute script paths even when editing in another checkout.
    working tree before edits. Load the role skill and the project's task map and
    command skill before any check, build or runtime action. Preserve an assigned
    checkout and verify its pinned head. For a new unit branch, branch from the
-   verified remote default branch and report if it is behind. Builders continue
+   verified remote default branch and report if it is behind; carry another
+   packet's commits only when your brief names that dependency. Builders continue
    from the assigned test commit (including any lead-approved test-worker
    amendment) rather than starting again from the default branch. On an existing
    unit branch, fetching and merging that branch before a push are allowed.

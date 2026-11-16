@@ -281,6 +281,11 @@ describe('jev-ask CLI', { timeout: 60_000 }, () => {
         }
         expect(await main(checkArgs('merged acceptance', [historical]), { client: rejecting })).toBe(2)
         expect(JSON.parse(String(output.log.mock.calls.at(-1)?.[0])).requestHash).not.toBe(line.requestHash)
+        const explained = String(output.error.mock.calls.at(-1)?.[0])
+        expect(explained).toContain('gap failing')
+        expect(explained).toContain('Accept: the label is whole')
+        expect(explained).toContain(`${historical} [current] (excerpt)`)
+        expect(explained).toContain(`${current} [historical] (excerpt)`)
         const script = join(import.meta.dirname, 'team-tasks.mjs')
         expect(spawnSync(process.execPath, [script, 'done', '1', '--owner', 'qa-1']).status).toBe(1)
         expect(await main(args, { client })).toBe(0)

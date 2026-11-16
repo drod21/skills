@@ -1,3 +1,4 @@
+import './jev-node-only.mjs'
 import { resolveBoardFile } from './team-board-path.mjs'
 // Score fix or approach options with one Jev call before the lead recommends or dispatches.
 // Usage: node scripts/jev-decide.ts <input.json> [--dry-run] [--out <result.json>] [--model jev-latest] [--force] [--task <id> --by <owner>]

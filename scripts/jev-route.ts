@@ -1,3 +1,4 @@
+import './jev-node-only.mjs'
 // Route agent-team tasks through Jev before dispatch (agent-team step 5).
 // Usage: node scripts/jev-route.ts "<title>" --role <role> [--after 3,5] [--brief <text>] [--add]
 //        node scripts/jev-route.ts --task <id> [--brief <text>]

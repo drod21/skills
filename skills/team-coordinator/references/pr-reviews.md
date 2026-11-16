@@ -25,7 +25,10 @@ threshold and deferred-finding rules in the coordinator's
    lines; a resolution that keeps the base's line adds no scope. A regression a
    changed line causes stays in scope even when it surfaces in unchanged code,
    such as a caller broken by a changed return value. A pre-existing defect the PR
-   neither touches nor causes is out of scope; suggest an issue instead. A PR
+   neither touches nor causes is out of scope; suggest an issue instead. Run
+   `git log --merges <base>..<head>`: a merge commit that brings in a sibling
+   packet's branch the plan does not name as a dependency is a blocking finding,
+   fixed by rebuilding the packet from `origin/main`. A PR
    number or worktree name alone does not select its contents.
 2. Prefer the already assigned review worktree when its HEAD matches the
    candidate. Preserve unrelated dirty work. Create another worktree only within

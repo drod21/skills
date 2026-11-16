@@ -1,3 +1,4 @@
+import './jev-node-only.mjs'
 import { resolveBoardFile } from './team-board-path.mjs'
 // A cheap Jev judgment: yes/no, a small pick, a preset, or the evidence check.
 // Usage: node scripts/jev-ask.ts --yes-no <q> [--task <id> --by <owner>] [--context <text>]
@@ -18,6 +19,7 @@ import { image, TypeSafeClient } from '@typesafe-ai/sdk'
 
 import {
   ASK_THRESHOLDS,
+  GAPS,
   PRESETS,
   buildAskRequest,
   buildCheckRequest,
@@ -93,6 +95,8 @@ type Prepared = {
   basis: number
   taskTitle: string
   hasImage: boolean
+  accept: string
+  seen: string[]
 }
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -546,7 +550,30 @@ async function prepare(args: AskArgs, exec: BoardExec, board: string): Promise<P
     basis: journalLength(task),
     taskTitle: taskTitle(task),
     hasImage: hasSentImage(images, items),
+    accept: taskAccept(task),
+    seen: items.map((item) => seenLine(item, args.currentEvidence)),
   }
+}
+
+function seenLine(item: ReferencedEvidence, current: string[]) {
+  const role = current.length ? (current.includes(item.ref) ? ' [current]' : ' [historical]') : ''
+  if ('sent' in item) return `${item.ref}${role} (not sent: ${item.why})`
+  return `${item.ref}${role} (${'image' in item ? 'image' : 'excerpt'})`
+}
+
+// Jev answers a check with a probability and a gap label only, never a per-clause reason, so an
+// unconfirmed check prints the accept text beside the evidence Jev saw for the worker to compare.
+function explainCheck(prepared: Prepared, outcome: AskOutcome | CheckOutcome) {
+  if (prepared.tool !== 'check' || outcome.outcome === 'confirmed') return
+  const gap = 'gap' in outcome && outcome.gap ? `${outcome.gap}: ${GAPS[outcome.gap]}` : 'none'
+  console.error(
+    [
+      `Jev did not confirm the evidence (gap ${gap}). Jev names no failing clause; compare each clause below with the evidence it saw.`,
+      `Accept: ${prepared.accept}`,
+      `Evidence Jev saw (${prepared.seen.length}):`,
+      ...prepared.seen.map((line) => `  - ${line}`),
+    ].join('\n'),
+  )
 }
 
 type Line = {
@@ -654,6 +681,7 @@ async function runAsk(args: AskArgs, client: Client, exec: BoardExec): Promise<n
       if (args.task) record(prepared, cached, null, exec)
       settled = true
       printLine({ ...lineFrom(cached, prepared), cached: true })
+      explainCheck(prepared, cached)
       return exitFor(cached.outcome, false)
     }
     let response: Awaited<ReturnType<Client['systemOne']>>
@@ -677,6 +705,7 @@ async function runAsk(args: AskArgs, client: Client, exec: BoardExec): Promise<n
     if (args.task) record(prepared, outcome, answers, exec)
     settled = true
     printLine(line)
+    explainCheck(prepared, outcome)
     return exitFor(outcome.outcome, false)
   } finally {
     // Failed recording or a process crash remains blocked until release/reap.

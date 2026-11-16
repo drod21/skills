@@ -141,8 +141,10 @@ fixing tests after the build.
    test, real-database test, end-to-end test for wiring and timing). A unit the
    lead cannot state this way is not ready to dispatch.
 2. **Test task.** Add a test task per unit ahead of the build task, routed to the
-   lightest executor that can carry it. Its brief is the acceptance cases plus
-   the allowed test and minimal-contract paths, nothing about how to build. The
+   lightest executor that can carry it. Its brief is the acceptance cases, the
+   lead's numbered owner and lead decisions those cases depend on (quoted, with
+   each case citing the decision number it encodes), and the allowed test and
+   minimal-contract paths, nothing about how to build. The
    test worker writes the tests and only the contract they need to compile
    (types, signatures, a module that throws "not implemented"), commits them as
    the unit branch's first commit, and returns the SHA, the locked test files,
@@ -152,7 +154,9 @@ fixing tests after the build.
    depend on are answered.
 3. **Build task.** Add it with `--after <test task id>`. `claim` refuses while the
    test task is open and `done` refuses a red test task even with `--force`. When
-   the red run returns, record the baseline with `decide <test id> --summary
+   the red run returns, check every expected value in it against the numbered
+   decisions; a mismatch goes back to the test worker as an amendment before the
+   builder is released. Then record the baseline with `decide <test id> --summary
    <SHA and red result> --by <lead>`, release the builder with `after <build id>
    none`, then dispatch. Close the test task with the builder's green run. The
    build brief names the test commit, the locked files and the run command, and
@@ -249,7 +253,9 @@ candidate SHA and verify that the assigned checkout's `HEAD` matches it exactly.
 
 Give each worker: task title and ID, role skill, absolute board script,
 checkout and head, allowed files, dependencies, acceptance checks and expected
-evidence. Workers follow the [worker protocol](references/worker-protocol.md).
+evidence. Every test and build brief says: branch from `origin/main` (a builder
+from its test commit on that branch); carry another packet's commits only when
+the plan names that dependency. Workers follow the [worker protocol](references/worker-protocol.md).
 A plain `claim <role> <owner>` returns the first eligible task for the role, which
 on a shared board can be another team's task. The lead claims the assigned task
 for the worker with `claim <role> <owner> --id <id>`, which takes exactly that

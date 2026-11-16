@@ -1,3 +1,4 @@
+import './jev-node-only.mjs'
 import { writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { join, resolve } from 'node:path'
