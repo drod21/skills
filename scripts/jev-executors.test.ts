@@ -71,7 +71,7 @@ describe('executor registry', () => {
       allExecutors()
         .filter((entry) => entry.facts.codeSpecialized)
         .map((entry) => entry.id),
-    ).toEqual(['opencode:opencode/kimi-k2.7-code'])
+    ).toEqual(['cursor:kimi-k2.7-code', 'opencode:opencode/kimi-k2.7-code'])
   })
 
   it('keeps the curated OpenCode entries paid and on the OpenCode provider', () => {
@@ -101,11 +101,13 @@ describe('availability', () => {
 
   it('drops a whole provider or one model named in --unavailable', () => {
     expect(ids(availableFor('grok_patch', { unavailable: ['cursor'] }))).not.toContain('cursor:grok-4.7')
-    expect(availableFor('grok_patch', { unavailable: ['cursor'] })).toHaveLength(TIER_EXECUTORS.grok_patch.length - 1)
+    expect(availableFor('grok_patch', { unavailable: ['cursor'] })).toEqual(
+      TIER_EXECUTORS.grok_patch.filter((entry) => entry.providerInstanceId !== 'cursor'),
+    )
     const oneModel = availableFor('grok_patch', { unavailable: ['opencode:opencode/kimi-k3'] })
     expect(ids(oneModel)).not.toContain('opencode:opencode/kimi-k3')
     expect(ids(oneModel)).toContain('opencode:console-xai/grok-4.7')
-    const noOpencode = availableFor('sonnet_patch', { unavailable: ['opencode'] })
+    const noOpencode = availableFor('sonnet_patch', { unavailable: ['opencode', 'cursor'] })
     expect(ids(noOpencode)).toEqual(['claudeAgent:claude-sonnet-5-5'])
   })
 
@@ -392,7 +394,7 @@ describe('executor in routed verdicts', () => {
     const { client } = clientFor(full(), { choice: 'claudeAgent:claude-sonnet-5-5', confidence: 0.99 })
     const [out] = await routeTasks(sample, client, { ...quiet, availability: { unavailable: ['claudeAgent'] } })
     // Jev named an executor that was filtered out, so the first available one stands.
-    expect(out!.verdict.executor).toMatchObject({ id: 'opencode:opencode/kimi-k3', source: 'default' })
+    expect(out!.verdict.executor).toMatchObject({ id: 'cursor:kimi-k3', source: 'default' })
     const available = parseAvailable(['claudeAgent:claude-sonnet-5-5'])
     const only = clientFor(full(), { choice: 'x', confidence: 1 })
     const [single] = await routeTasks(sample, only.client, { ...quiet, availability: { available } })

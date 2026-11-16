@@ -26,6 +26,16 @@ const CODEX_LUNA = row('codex', 'gpt-6-luna', 'GPT', [0.1, 0.5], { reasoningEffo
 const CODEX_TERRA = row('codex', 'gpt-6.1-terra', 'GPT', [1, 5], { reasoningEffort: 'high' })
 const CURSOR_GROK = row('cursor', 'grok-4.7', 'Grok', [2, 6], { reasoning_effort: 'high' })
 const GROK_DIRECT = row('grok', 'grok-4.7', 'Grok', [2, 6], { reasoningEffort: 'high' })
+// Cursor rows reuse the OpenCode snapshot price of the same model.
+const CURSOR_DEEPSEEK_FLASH = row('cursor', 'deepseek-v41-flash-1017', 'DeepSeek', [0.15, 0.6], {
+  reasoning_effort: 'high',
+})
+const CURSOR_GLM_FLASH = row('cursor', 'glm-5p3-flash', 'GLM', [0.15, 0.5], { reasoning: 'high' })
+const CURSOR_KIMI_CODE = row('cursor', 'kimi-k2.7-code', 'Kimi', [0.95, 4])
+const CURSOR_GLM = row('cursor', 'glm-5p3', 'GLM', [1.4, 4.4], { reasoning: 'high' })
+const CURSOR_KIMI_K3 = row('cursor', 'kimi-k3', 'Kimi', [3, 15], { reasoning: 'high' })
+const CURSOR_GEMINI = row('cursor', 'gemini-4-argon', 'Gemini', [2, 10], { reasoning_effort: 'high' })
+const CURSOR_OPUS = row('cursor', 'claude-opus-5-5', 'Claude', [4, 20], { effort: 'high' })
 const OC_GPT_LUNA = row(OC, 'console-openai/gpt-6-luna', 'GPT', [0.1, 0.5])
 const OC_QWEN_FLASH = row(OC, 'opencode/qwen3.8-flash', 'Qwen', [0.15, 0.47])
 const OC_DEEPSEEK_FLASH = row(OC, 'opencode-go/deepseek-v4.1-flash', 'DeepSeek', [0.15, 0.6])
@@ -48,16 +58,45 @@ const OC_GPT_SOL = row(OC, 'console-openai/gpt-6.1-sol', 'GPT', [2, 10])
 export const TIER_EXECUTORS = Object.freeze({
   haiku_fork: Object.freeze([
     CLAUDE_HAIKU,
+    CURSOR_DEEPSEEK_FLASH,
+    CURSOR_GLM_FLASH,
     OC_GPT_LUNA,
     OC_QWEN_FLASH,
     OC_DEEPSEEK_FLASH,
     OC_GLM_FLASH,
     OC_MINIMAX_FLASH,
   ]),
-  luna_patch: Object.freeze([CODEX_LUNA, OC_KIMI_CODE, OC_GLM, OC_MINIMAX, OC_QWEN_PLUS, OC_MISTRAL]),
-  grok_patch: Object.freeze([CURSOR_GROK, GROK_DIRECT, OC_XAI_GROK, OC_KIMI_K3, OC_DEEPSEEK_PRO, OC_GLM]),
-  sonnet_patch: Object.freeze([CLAUDE_SONNET, OC_KIMI_K3, OC_QWEN_MAX, OC_GEMINI, OC_MISTRAL, OC_KIMI_PRO]),
-  terra_patch: Object.freeze([CODEX_TERRA, CLAUDE_OPUS, OC_GPT_SOL, OC_GEMINI, OC_KIMI_PRO]),
+  luna_patch: Object.freeze([
+    CODEX_LUNA,
+    CURSOR_KIMI_CODE,
+    CURSOR_GLM,
+    OC_KIMI_CODE,
+    OC_GLM,
+    OC_MINIMAX,
+    OC_QWEN_PLUS,
+    OC_MISTRAL,
+  ]),
+  grok_patch: Object.freeze([
+    CURSOR_GROK,
+    CURSOR_KIMI_K3,
+    CURSOR_GLM,
+    GROK_DIRECT,
+    OC_XAI_GROK,
+    OC_KIMI_K3,
+    OC_DEEPSEEK_PRO,
+    OC_GLM,
+  ]),
+  sonnet_patch: Object.freeze([
+    CLAUDE_SONNET,
+    CURSOR_KIMI_K3,
+    CURSOR_GEMINI,
+    OC_KIMI_K3,
+    OC_QWEN_MAX,
+    OC_GEMINI,
+    OC_MISTRAL,
+    OC_KIMI_PRO,
+  ]),
+  terra_patch: Object.freeze([CODEX_TERRA, CLAUDE_OPUS, CURSOR_OPUS, CURSOR_GEMINI, OC_GPT_SOL, OC_GEMINI, OC_KIMI_PRO]),
 })
 
 const BY_ID = new Map()
