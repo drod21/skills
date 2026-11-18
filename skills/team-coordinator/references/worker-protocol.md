@@ -6,9 +6,8 @@ specialist advice or edits, do not create or claim board tasks automatically.
 In the [standing team cycle](operating-cycle.md), report to your assigned area
 lead. Read applicable [owner preferences](owner-preferences.md) before drafting
 and include their references in your handoff. Return product evidence using the
-cycle's review packet, including screenshots and playable video for every UX
-change as well as every product review. Missing or stale captures leave UX work
-unfinished. Send new ideas and candidate preference lessons, with supporting evidence, to the
+cycle's review packet and follow the [delivery evidence rules](../../pr-delivery/SKILL.md)
+for required captures. Send new ideas and candidate preference lessons, with supporting evidence, to the
 lead; do not modify shared preference memory or create a separate human inbox.
 The chief of staff consolidates human decisions across leads.
 

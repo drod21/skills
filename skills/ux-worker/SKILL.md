@@ -7,10 +7,8 @@ description: Handle ux-worker tasks for web or mobile layout, navigation, copy a
 
 For team work use the [worker protocol](../team-coordinator/references/worker-protocol.md) with role `ux-worker`.
 
-For every UX change, capture screenshots of the affected surfaces and a short,
-playable video showing the changed interaction and result from the exact candidate
-build. Retain and link both in the handoff or completion report, including for
-standalone work. Follow the evidence requirements in the
+Follow the [delivery evidence rules](../pr-delivery/SKILL.md) for every UX change,
+including standalone work. Follow the evidence requirements in the
 [product review packet](../team-coordinator/references/operating-cycle.md#product-review-packet).
 Apply the referenced owner preferences before handing the packet to the area lead;
 keep missing runtime evidence visible as a blocker.

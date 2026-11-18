@@ -46,6 +46,11 @@ node "$TOOLKIT/scripts/jev-ask.ts" --check-evidence --task 1 --by worker-1 \
   --current-evidence /retained/path/checks.txt
 ```
 
+Add `--preflight` to the same evidence-check command to validate the packet
+locally and inspect the acceptance criteria and artifact manifest. Preflight
+does not call Jev or record a verdict. Compare the manifest with the criteria
+before submitting the live check.
+
 `--phase` and repeatable `--current-evidence` are check-only and must be supplied
 together. Phase names the acceptance checkpoint; the task stays `claimed` until
 `done`. Phase and summary are declarations, not proof. Selected receipts are

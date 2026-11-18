@@ -402,6 +402,21 @@ describe('jev-ask CLI', { timeout: 60_000 }, () => {
     }
     const output = capture()
     try {
+      const preflight = await main(
+        ['--check-evidence', '--preflight', '--summary', 'Focused suite passes', '--task', '1', '--by', 'qa-1'],
+        { client },
+      )
+      expect(preflight).toBe(0)
+      expect(JSON.parse(String(output.log.mock.calls.at(-1)?.[0]))).toMatchObject({
+        outcome: 'preflight_ready',
+        evidence: [expect.stringContaining('focused.txt')],
+      })
+      expect(sent).toHaveLength(0)
+      const stillBlocked = spawnSync(process.execPath, [script, 'done', '1', '--owner', 'qa-1'], {
+        env,
+        encoding: 'utf8',
+      })
+      expect(stillBlocked.stderr).toContain('NeverDoneUnconfirmed')
       const code = await main(
         ['--check-evidence', '--summary', 'Focused suite passes', '--task', '1', '--by', 'qa-1'],
         {
