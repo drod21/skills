@@ -25,6 +25,8 @@ import { createHash, randomBytes } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { type } from 'arktype'
+import { assertEvidenceScope, normalizeEvidenceScope } from './evidence-scope.mjs'
+import { normalizeGitProof, verifyGitProof } from './board-git-proof.mjs'
 
 import { enqueueDeliveries, settleClaimOnlyDeliveries } from './team-board-delivery.mjs'
 import { matchStoredExecutor } from './jev-executors.catalog.mjs'
@@ -953,12 +955,14 @@ export function addTask(board, input = {}) {
   const storedJev = storedAddJev(board, fields)
   assertCatalogRole(fields.role)
   const accept = cleanAccept(fields.accept)
-  assertAcceptForRole(fields.role, accept)
+  const gitProof = input.gitProof == null ? null : normalizeGitProof(input.gitProof)
+  assertAcceptForRole(fields.role, accept || gitProof)
   // A gated task's title goes to Jev with its evidence check, so it gets the same text check.
   if (accept) cleanText(fields.title, 'title')
   const tag = cleanTag(fields.tag)
   const task = blankTask(board, fields, storedJev)
   stampAcceptAndTag(task, accept, tag)
+  if (gitProof) task.gitProof = gitProof
   if (input.review === true) task.reviewRequired = true
   if (storedJev) task.jev = storedJev
   applyExplicitRoute(task, fields.route, storedJev, fields.reason, fields.by, fields.now)
@@ -1293,7 +1297,12 @@ export function normalizeJudgment(raw, now = new Date()) {
   const outcome = assertOutcome(tool, value.outcome)
   assertJudgmentAnswers(value.answers)
   const evidence = assertJudgmentEvidence(tool, value.evidence)
-  return judgmentRecord({ ...value, tool, outcome }, now, evidence, assertJudgmentBasis(tool, value.basis))
+  const record = judgmentRecord({ ...value, tool, outcome }, now, evidence, assertJudgmentBasis(tool, value.basis))
+  if (value.scope !== undefined) {
+    if (tool !== 'check') judgmentError('scope is only stored on a check')
+    record.scope = normalizeEvidenceScope(value.scope)
+  }
+  return record
 }
 
 function refuseFinished(task, action) {
@@ -1302,8 +1311,31 @@ function refuseFinished(task, action) {
 }
 
 function assertGatedClaim(task, action) {
-  if (!task.accept || task.status === 'claimed') return
+  if ((!task.accept && !task.gitProof) || task.status === 'claimed') return
   throw new Error(`task ${task.id} is ${task.status}; ${action} on a gated task needs a claim`)
+}
+
+function claimedGitTask(board, id, by) {
+  const task = findLiveTask(board, id)
+  if (!task.gitProof) throw new Error(`task ${id} has no pinned Git proof requirement`)
+  if (!by || task.status !== 'claimed' || task.owner !== by)
+    throw new Error(`task ${id} needs its claim owner to verify Git proof`)
+  return task
+}
+
+export function prepareGitProof(board, id, by) {
+  const task = claimedGitTask(board, id, by)
+  return { by, proof: task.gitProof, basis: decisionEntries(task).length, facts: verifyGitProof(task.gitProof) }
+}
+
+export function recordGitProof(board, id, { by, proof, basis, facts, now = new Date() }) {
+  const task = claimedGitTask(board, id, by)
+  const decisions = decisionEntries(task)
+  if (JSON.stringify(proof) !== JSON.stringify(task.gitProof) ||
+    basis > decisions.length || decisions.slice(basis).some(isInvalidator))
+    throw new Error(`task ${id} changed while verifying Git proof; run verify-git again`)
+  appendDecision(task, { kind: 'git-proof', at: now.toISOString(), by, proof: task.gitProof, ...facts })
+  return task
 }
 
 /**
@@ -1318,13 +1350,20 @@ export function addJudgment(board, id, raw, { now = new Date() } = {}) {
   if (task.accept && judgment.by !== task.owner)
     throw new Error(`task ${task.id} is claimed by ${task.owner}; a judgment on a gated task must be by the owner`)
   refuseStaleCheck(task, judgment)
+  if (judgment.tool === 'check' && task.gitProof && !judgment.scope)
+    throw new Error(`task ${task.id} needs a scoped check for the pinned candidate`)
+  if (judgment.scope) {
+    if (!sameEvidence(judgment.evidence, task.evidence))
+      throw new Error(`task ${task.id} evidence changed while the check ran; run the check again`)
+    assertEvidenceScope(task, judgment.scope)
+  }
   appendDecision(task, judgment)
   return task
 }
 
 // Register before leaving the board lock for Jev. Revalidate the snapshot so a
 // release or evidence change between show and registration cannot be missed.
-export function startEvidenceCheck(board, id, { by, token, evidence, basis }) {
+export function startEvidenceCheck(board, id, { by, token, evidence, basis, scope }) {
   const task = findLiveTask(board, id)
   if (!task.accept || task.status !== 'claimed' || task.owner !== by)
     throw new Error(`task ${id} is not claimed by ${by}`)
@@ -1337,8 +1376,10 @@ export function startEvidenceCheck(board, id, { by, token, evidence, basis }) {
   )
     throw new Error(`task ${id} changed while preparing the check; run the check again`)
   if (task.pendingChecks?.length) throw new Error(`task ${id} already has an evidence check in flight`)
+  const checked = scope === undefined ? undefined : normalizeEvidenceScope(scope)
+  assertEvidenceScope(task, checked)
   task.pendingChecks ??= []
-  task.pendingChecks.push({ token, by })
+  task.pendingChecks.push({ token, by, ...(checked && { scope: checked, evidence }) })
   return task
 }
 
@@ -1353,6 +1394,15 @@ export function abandonStaleEvidenceCheck(board, id, { token, by, basis }) {
   const task = findLiveTask(board, id)
   if (task.status !== 'claimed' || task.owner !== by || decisionEntries(task).slice(basis).some(isInvalidator))
     return endEvidenceCheck(board, id, token)
+  const check = task.pendingChecks?.find((entry) => entry.token === token)
+  if (check?.scope) {
+    if (!sameEvidence(check.evidence, task.evidence)) return endEvidenceCheck(board, id, token)
+    try {
+      assertEvidenceScope(task, check.scope)
+    } catch {
+      return endEvidenceCheck(board, id, token)
+    }
+  }
   return task
 }
 
@@ -1403,7 +1453,8 @@ export function acceptEvidence(board, id, { reason, by, now = new Date() } = {})
   // The lead accepts what Jev was unsure about, not evidence added after that check.
   if (!sameEvidence(check.evidence, task.evidence))
     throw new Error(`task ${task.id} evidence changed since the last check; run the check again`)
-  const decision = { kind: 'accept', at: now.toISOString(), by: cleanedBy, reason: trimmed, evidence }
+  assertEvidenceScope(task, check.scope)
+  const decision = { kind: 'accept', at: now.toISOString(), by: cleanedBy, reason: trimmed, evidence, ...(check.scope && { scope: check.scope }) }
   appendDecision(task, decision)
   enqueueDeliveries(board, task, decision)
   return task
@@ -1501,11 +1552,20 @@ export function ownerGate(task) {
  * over an owner thread that is still open (ownerThread).
  */
 export function doneBlockers(task) {
-  if (!task?.accept) return [...ownerThreadBlockers(task), ...reviewBlockers(task)]
   const blockers = []
-  if (!evidenceItems(task).length) blockers.push('NeverDoneUnchecked: no evidence')
-  if (!hasFreshConfirmation(task))
-    blockers.push('NeverDoneUnconfirmed: no confirmed check or accept for the current evidence')
+  if (task?.gitProof) {
+    const decisions = decisionEntries(task)
+    const proof = decisions.findLastIndex((entry) => entry?.kind === 'git-proof')
+    if (proof < 0 || JSON.stringify(decisions[proof].proof) !== JSON.stringify(task.gitProof) ||
+      decisions.slice(proof + 1).some(isInvalidator))
+      blockers.push('NeverDoneWithoutGitProof: run verify-git against the pinned requirement')
+  }
+  if (!task?.accept && !task?.gitProof) return [...ownerThreadBlockers(task), ...reviewBlockers(task)]
+  if (task.accept) {
+    if (!evidenceItems(task).length) blockers.push('NeverDoneUnchecked: no evidence')
+    if (!hasFreshConfirmation(task))
+      blockers.push('NeverDoneUnconfirmed: no confirmed check or accept for the current evidence')
+  }
   if (hasOpenHold(task)) blockers.push('NeverDoneWhileHeld: an ask or decide hold has no later choice')
   if (task.pendingChecks?.some((check) => check.by === task.owner))
     blockers.push('NeverDoneWhileAskingJev: an evidence check is in flight')
@@ -1577,8 +1637,9 @@ export function currentCheck(task) {
 function assertDoneAble(task) {
   if (task.status === 'done') return
   const blockers = doneBlockers(task)
-  if (!blockers.length) return
-  throw new Error(`task ${task.id} is not done-able: ${blockers.join('; ')}`)
+  if (blockers.length) throw new Error(`task ${task.id} is not done-able: ${blockers.join('; ')}`)
+  const verdict = decisionEntries(task).findLast((entry) => isEvidenceVerdict(entry, task.evidence))
+  assertEvidenceScope(task, verdict?.scope)
 }
 
 function trimmedEvidenceItem(item) {
@@ -1589,15 +1650,15 @@ function trimmedEvidenceItem(item) {
   return trimmed
 }
 
-function appendEvidence(task, items) {
+function appendEvidence(task, items, field = 'evidence') {
   if (task.status === 'cancelled')
     throw new Error(`task ${task.id} is cancelled; a cancelled task cannot take evidence`)
   assertGatedClaim(task, 'evidence')
-  if (task.evidence != null && !Array.isArray(task.evidence))
+  if (task[field] != null && !Array.isArray(task[field]))
     throw new Error(`task ${task.id} has evidence that is not a list`)
-  if (Array.isArray(task.evidence) && task.evidence.some((item) => typeof item !== 'string'))
+  if (Array.isArray(task[field]) && task[field].some((item) => typeof item !== 'string'))
     throw new Error(`task ${task.id} has evidence that is not all strings`)
-  const existing = Array.isArray(task.evidence) ? task.evidence : []
+  const existing = Array.isArray(task[field]) ? task[field] : []
   const seen = new Set(existing)
   const next = [...existing]
   for (const item of items) {
@@ -1606,13 +1667,13 @@ function appendEvidence(task, items) {
     seen.add(trimmed)
     next.push(trimmed)
   }
-  task.evidence = next
+  task[field] = next
 }
 
-export function addEvidence(board, id, items) {
+export function addEvidence(board, id, items, { supporting = false } = {}) {
   if (!items?.length) throw new Error('usage: evidence <id> <item...>')
   const task = findLiveTask(board, id)
-  appendEvidence(task, items)
+  appendEvidence(task, items, supporting ? 'supportingEvidence' : 'evidence')
   return task
 }
 
@@ -2144,7 +2205,7 @@ function openHoldFindings(board) {
 
 function doneUnconfirmedFindings(board) {
   return board.tasks
-    .filter((task) => task.status === 'done' && task.accept && doneBlockers(task).length)
+    .filter((task) => task.status === 'done' && (task.accept || task.gitProof) && doneBlockers(task).length)
     .map((task) =>
       finding(
         'warn',

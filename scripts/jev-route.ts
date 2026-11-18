@@ -15,7 +15,8 @@ import './jev-node-only.mjs'
 // Needs TYPESAFE_API_KEY.
 // Run under Node 22.18+, not Bun: @typesafe-ai/sdk 0.7.0 throws "Body already used" on Bun 1.4.4.
 import { execFileSync } from 'node:child_process'
-import { readFileSync, realpathSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import { readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -24,15 +25,18 @@ import { type } from 'arktype'
 
 import {
   askExecutor,
+  TIER_EXECUTORS,
   availableFor,
   isTierRoute,
   parseAvailableText,
+  pickExecutor,
+  readChoice,
   verdictExecutor,
   type Availability,
   type ChoiceAnswer,
   type VerdictExecutor,
 } from './jev-executors.lib.ts'
-import { cleanText, redactApiKey } from './jev-guard.lib.ts'
+import { assertApiKeyAbsent, cleanText, redactApiKey } from './jev-guard.lib.ts'
 import {
   askJev,
   calibrate,
@@ -47,7 +51,7 @@ import {
 import { ROLES, unknownRoleMessage } from './team-catalog.mjs'
 
 const USAGE =
-  'usage: node scripts/jev-route.ts "<title>" --role <role> [--after 3,5] [--brief <text>] [--accept <text>] [--tag <t>] [--add] | --task <id> [--brief <text>] [--accept <text>] | <tasks.json> | --calibrate [--json]; any form takes [--available <file.json>] [--unavailable <providerInstanceId[:model]>]...'
+  'usage: node scripts/jev-route.ts "<title>" --role <role> [--after 3,5] [--brief <text>] [--accept <text>] [--tag <t>] [--add] | --task <id> [--brief <text>] [--accept <text>] | <tasks.json> | --calibrate [--json]; takes [--available <file.json>] [--unavailable <providerInstanceId[:model]>]...; a standalone route can take --reuse-dir <dir> --reuse-risk <label> with --available'
 
 export function flag(args: string[], name: string) {
   const at = args.indexOf(name)
@@ -176,10 +180,14 @@ async function chooseExecutor(
   task: Task,
   decision: Decision,
   availability: Availability | undefined,
+  cachedPick?: { answer: ChoiceAnswer | null },
 ): Promise<ExecutorOutcome> {
   if (decision.holds.length || !isTierRoute(decision.route)) return NO_EXECUTOR
   const offered = availableFor(decision.route, availability)
-  const { pick, answer } = await askExecutor(client, task, decision.route, offered, THRESHOLDS.minExecutorConfidence)
+  const reused = cachedPick && readChoice(cachedPick.answer, offered)
+  const { pick, answer } = cachedPick
+    ? { pick: pickExecutor(decision.route, offered, reused ?? null, THRESHOLDS.minExecutorConfidence), answer: reused ?? null }
+    : await askExecutor(client, task, decision.route, offered, THRESHOLDS.minExecutorConfidence)
   return {
     executor: verdictExecutor(pick),
     reasons: pick.reasons,
@@ -199,6 +207,7 @@ type RouteOptions = {
   tag?: string
   /** The executors the lead's harness offers; absent means every registry executor. */
   availability?: Availability
+  reuse?: { dir: string; risk: string }
   boardScript?: string
   exec?: BoardExec
   readTasks?: () => BoardTask[]
@@ -329,6 +338,51 @@ function pickSubjects(tasks: Task[], boardTasks: BoardTask[], options: RouteOpti
 const needsBoard = (tasks: Task[], options: RouteOptions) =>
   Boolean(options.taskId) || tasks.some((task) => Boolean(task.after?.length))
 
+type ReusableRoute = { answers: Answers; answer: ChoiceAnswer | null }
+
+function reusePath(task: Task, { reuse, availability }: RouteOptions) {
+  if (!reuse || !availability?.available) return null
+  if (!statSync(reuse.dir).isDirectory()) throw new Error('--reuse-dir needs a task-owned directory')
+  const risk = cleanText(reuse.risk, 'reuse risk')
+  const key = createHash('sha256').update(JSON.stringify({
+    version: 1, model: 'jev-latest', thresholds: THRESHOLDS,
+    role: task.role, risk, accept: task.accept,
+    catalog: TIER_EXECUTORS,
+    available: [...availability.available].sort(),
+    unavailable: [...new Set(availability.unavailable)].sort(),
+  })).digest('hex')
+  return join(reuse.dir, `route-${key}.json`)
+}
+
+function loadReusableRoute(path: string | null, task: Task, availability?: Availability) {
+  if (!path) return null
+  try {
+    const cached = JSON.parse(readFileSync(path, 'utf8')) as ReusableRoute
+    const decision = decide(cached.answers, task)
+    if (decision.holds.length || decision.roleFits !== true) return null
+    if (isTierRoute(decision.route)) {
+      const offered = availableFor(decision.route, availability)
+      const choice = readChoice(cached.answer, offered)
+      if (!offered.length || (offered.length > 1 && (!choice || choice.confidence < THRESHOLDS.minExecutorConfidence)))
+        return null
+    } else if (decision.route !== 'deterministic_script') return null
+    return cached
+  } catch {
+    return null
+  }
+}
+
+function saveReusableRoute(path: string, value: ReusableRoute) {
+  assertApiKeyAbsent(value)
+  const temporary = `${path}.${randomUUID()}.tmp`
+  try {
+    writeFileSync(temporary, JSON.stringify(value), { mode: 0o600, flag: 'wx' })
+    renameSync(temporary, path)
+  } finally {
+    rmSync(temporary, { force: true })
+  }
+}
+
 export async function routeTasks(tasks: Task[], client: Pick<TypeSafeClient, 'systemOne'>, options: RouteOptions = {}) {
   refuseMixedRouteFlags(options, tasks.length)
   refuseOffCatalogAdd(tasks, options)
@@ -338,15 +392,26 @@ export async function routeTasks(tasks: Task[], client: Pick<TypeSafeClient, 'sy
   const log = options.log ?? ((line: string) => console.log(line))
   const readTasks = options.readTasks ?? (() => readBoardTasks(board))
   const subjects = pickSubjects(tasks, needsBoard(tasks, options) ? readTasks() : [], options)
-  const answered = await Promise.all(subjects.map(async (task) => ({ task, answers: await askJev(client, task) })))
+  if (options.reuse && (options.add || options.taskId || subjects.length !== 1 || needsBoard(tasks, options) || !options.availability?.available))
+    throw new Error('route reuse requires a single standalone task and --available')
+  const answered = await Promise.all(subjects.map(async (task) => {
+    const path = reusePath(task, options)
+    const cached = loadReusableRoute(path, task, options.availability)
+    return { task, answers: cached?.answers ?? await askJev(client, task), path, cached }
+  }))
   const results = []
-  for (const { task, answers } of answered) {
+  for (const { task, answers, path, cached } of answered) {
     const decision = decide(answers, task)
-    const outcome = await chooseExecutor(client, task, decision, options.availability)
+    const outcome = await chooseExecutor(client, task, decision, options.availability, cached ?? undefined)
     const verdict = verdictFrom(decision, answers, outcome)
     // On --add, Jev's confident owner replaces a role it judged wrong. An existing task keeps its role.
     const role = options.add && decision.adoptRole && decision.suggestedRole ? decision.suggestedRole : task.role
-    log(printedLine(task, role, verdict, answers))
+    const save = path && !cached && decision.roleFits === true && !decision.holds.length &&
+      (decision.route === 'deterministic_script' || (outcome.executor && (outcome.offered.length === 1 || outcome.executor.source === 'jev')))
+    if (save)
+      saveReusableRoute(path, { answers, answer: outcome.answer })
+    const line = printedLine(task, role, verdict, answers)
+    log(cached || save ? JSON.stringify({ ...JSON.parse(line), reused: Boolean(cached), routingReceipt: path }) : line)
     writeVerdict(exec, board, task, role, decision, verdict, options)
     results.push({ task, role, answers, decision, verdict })
   }
@@ -416,6 +481,8 @@ function positionalArgs(args: string[]) {
     '--tag',
     '--available',
     '--unavailable',
+    '--reuse-dir',
+    '--reuse-risk',
   ])
   const positionals: string[] = []
   for (let index = 0; index < args.length; index++) {
@@ -455,6 +522,9 @@ if (isDirectRun()) {
       const accept = acceptFlag(args)
       const tag = tagFlag(args)
       const availability = availabilityFlags(args)
+      const reuseDir = textFlag(args, '--reuse-dir')
+      const reuseRisk = textFlag(args, '--reuse-risk')
+      if (Boolean(reuseDir) !== Boolean(reuseRisk)) throw new Error('supply --reuse-dir and --reuse-risk together')
       await routeTasks(tasks, client, {
         add: args.includes('--add'),
         taskId,
@@ -462,6 +532,7 @@ if (isDirectRun()) {
         accept,
         tag,
         availability,
+        reuse: reuseDir && reuseRisk ? { dir: reuseDir, risk: reuseRisk } : undefined,
       })
     }
   } catch (error) {

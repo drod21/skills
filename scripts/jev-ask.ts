@@ -16,6 +16,7 @@ import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { image, TypeSafeClient } from '@typesafe-ai/sdk'
+import { evidenceDigest, readScopedEvidence } from './evidence-scope.mjs'
 
 import {
   ASK_THRESHOLDS,
@@ -92,6 +93,7 @@ type Prepared = {
   tool: 'ask' | 'check'
   question: string
   evidence: string[]
+  scope?: { title: string; accept: string; candidate?: string; artifacts: { path: string; sha256: string }[] }
   basis: number
   taskTitle: string
   hasImage: boolean
@@ -389,12 +391,18 @@ function textExcerpt(name: string, bytes: Buffer): EvidenceItem {
   }
 }
 
-function loadOne(item: string): EvidenceItem {
+function loadOne(item: string, hashes?: Map<string, string>): EvidenceItem {
   const name = basename(item)
   const refused = secretFileReason(name)
   if (refused) return { name, sent: false, why: refused }
-  const bytes = fileBytes(item)
+  let bytes: Buffer | null
+  try {
+    bytes = hashes ? readScopedEvidence(item) : fileBytes(item)
+  } catch {
+    return { name, sent: false, why: 'not a readable absolute retained file of at most 25 MiB' }
+  }
   if (!bytes) return { name, sent: false, why: 'not a readable file' }
+  hashes?.set(item, evidenceDigest(bytes))
   const kind = imageKind(bytes)
   if (!kind) return textExcerpt(name, bytes)
   if (bytes.length > MAX_IMAGE_BYTES) return { name, sent: false, why: 'image is over 5 MB' }
@@ -404,7 +412,7 @@ function loadOne(item: string): EvidenceItem {
 }
 
 // At most MAX_EVIDENCE_ITEMS items and MAX_IMAGES images go out; the rest are listed as not sent.
-async function loadEvidence(items: string[], current: string[]): Promise<ReferencedEvidence[]> {
+function loadEvidence(items: string[], current: string[], hashes?: Map<string, string>): ReferencedEvidence[] {
   const missing = current.findIndex((ref) => !items.includes(ref))
   if (missing !== -1)
     throw new Error(`--current-evidence must match a retained task evidence path exactly (selection ${missing + 1})`)
@@ -414,7 +422,7 @@ async function loadEvidence(items: string[], current: string[]): Promise<Referen
     let loaded: EvidenceItem =
       index >= MAX_EVIDENCE_ITEMS
         ? { name: basename(item), sent: false, why: 'over the evidence item cap' }
-        : loadOne(item)
+        : loadOne(item, hashes)
     if ('image' in loaded && ++images > MAX_IMAGES)
       loaded = { name: loaded.name, sent: false, why: 'over the image cap' }
     if (current.includes(item) && 'sent' in loaded)
@@ -471,6 +479,7 @@ type ShownTask = {
   id?: number
   title?: string
   accept?: string
+  gitProof?: { candidate: string }
   evidence?: unknown
   decisions?: unknown
   status?: string
@@ -505,7 +514,11 @@ function requestFor(
 ) {
   if (ask) return buildAskRequest(ask, { context, images })
   return buildCheckRequest(
-    { title: cleanText(taskTitle(task), 'task title'), accept: cleanText(taskAccept(task), 'task accept') },
+    {
+      title: cleanText(taskTitle(task), 'task title'),
+      accept: cleanText(taskAccept(task), 'task accept'),
+      ...(task?.gitProof && { candidate: task.gitProof.candidate }),
+    },
     cleanText(args.summary, 'summary'),
     items,
     args.phase !== undefined
@@ -532,10 +545,19 @@ async function prepare(args: AskArgs, exec: BoardExec, board: string): Promise<P
   assertClaimed(task, args.by)
   assertCheckReady(args, task, evidence)
   const ask = args.mode === 'check' ? null : askFrom(args)
-  const items = ask ? [] : await loadEvidence(evidence, args.currentEvidence)
+  if (!ask && task?.gitProof && args.phase === undefined)
+    throw new Error('a mixed Git and Jev gate needs --phase and --current-evidence for the pinned candidate')
+  const hashes = args.phase === undefined ? undefined : new Map<string, string>()
+  const items = ask ? [] : loadEvidence(evidence, args.currentEvidence, hashes)
+  const scope = hashes && {
+    title: taskTitle(task),
+    accept: taskAccept(task),
+    ...(task?.gitProof && { candidate: task.gitProof.candidate }),
+    artifacts: Array.from(hashes, ([path, sha256]) => ({ path, sha256 })),
+  }
   const request = requestFor(args, ask, context, images, task, items)
   assertApiKeyAbsent(request)
-  const requestHash = hashRequest(request)
+  const requestHash = hashRequest(scope ? { request, scope } : request)
   const tool = ask ? 'ask' : 'check'
   const receipt = receiptFor(args, board, tool, requestHash)
   return {
@@ -547,6 +569,7 @@ async function prepare(args: AskArgs, exec: BoardExec, board: string): Promise<P
     tool,
     question: journalQuestion(args, ask),
     evidence,
+    scope,
     basis: journalLength(task),
     taskTitle: taskTitle(task),
     hasImage: hasSentImage(images, items),
@@ -630,7 +653,9 @@ function record(prepared: Prepared, outcome: AskOutcome | CheckOutcome, answers:
     ...(answers && typeof answers === 'object' ? { answers } : {}),
   }
   const payload = toJudgment(prepared.tool, outcome, meta)
-  exec(join(scriptDir, 'team-tasks.mjs'), ['judgment', prepared.args.task ?? '', JSON.stringify(payload)])
+  exec(join(scriptDir, 'team-tasks.mjs'), [
+    'judgment', prepared.args.task ?? '', JSON.stringify({ ...payload, scope: prepared.scope }),
+  ])
 }
 
 async function callJev(prepared: Prepared, client: Client) {
@@ -669,7 +694,7 @@ async function runAsk(args: AskArgs, client: Client, exec: BoardExec): Promise<n
     exec(join(scriptDir, 'team-tasks.mjs'), [
       'check-start',
       args.task!,
-      JSON.stringify({ by: args.by, token, evidence: prepared.evidence, basis: prepared.basis }),
+      JSON.stringify({ by: args.by, token, evidence: prepared.evidence, basis: prepared.basis, scope: prepared.scope }),
     ])
   let settled = false
   try {
@@ -696,6 +721,7 @@ async function runAsk(args: AskArgs, client: Client, exec: BoardExec): Promise<n
       ...line,
       model: response.model ?? null,
       request: prepared.request,
+      scope: prepared.scope,
       answers,
       thresholds: ASK_THRESHOLDS,
     })
@@ -726,7 +752,7 @@ function finishDown(prepared: Prepared, error: unknown, exec: BoardExec) {
     reasons: [`unavailable: ${message}`],
   }
   const line = lineFrom(outcome, prepared)
-  writeReceipt(prepared, { ...line, model: null, request: prepared.request, answers: null, thresholds: ASK_THRESHOLDS })
+  writeReceipt(prepared, { ...line, model: null, request: prepared.request, scope: prepared.scope, answers: null, thresholds: ASK_THRESHOLDS })
   if (prepared.args.task) record(prepared, outcome, null, exec)
   printLine(line)
   return 1
