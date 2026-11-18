@@ -25,9 +25,8 @@ Scope: agent coordination and human product review.
 
 - One lead agent per area of focus, and a chief of staff that oversees them.
 - Decisions and reviews reach the human through one prioritized queue, in batches.
-- Every UX change and product review carries screenshots and a short, playable
-  feature video from the exact candidate build, linked in the handoff or completion
-  report. Missing or stale captures leave UX work unfinished.
+- Follow the [delivery evidence rules](../../pr-delivery/SKILL.md) for
+  exact-candidate screenshots and when video is required.
 - Review works by voice and keyboard shortcuts; leads bring useful new ideas.
 - Learn from actual owner feedback so recommendations need fewer corrections.
 - Exceptions: internal and documentation-only changes with no UX effect need no

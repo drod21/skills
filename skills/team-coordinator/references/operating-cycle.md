@@ -110,11 +110,8 @@ not authorize deployment or a production release.
 
 ## Product review packet
 
-Every UX change requires screenshots of the affected surfaces and a short,
-playable video demonstrating the changed interaction and result from the exact
-candidate build, including standalone work and changes without a human product
-review. Retain and link both in the handoff or completion report. Missing or stale
-captures leave the UX change unfinished.
+Apply the [delivery evidence rules](../../pr-delivery/SKILL.md) to every
+UX change, including standalone work and changes without a human product review.
 
 For every product review, attach:
 
@@ -122,16 +119,16 @@ For every product review, attach:
   and the exact decision requested.
 - Candidate SHA and any uncommitted patch identity, build and platform,
   reproduction steps and acceptance results with links to actual check output.
-- Screenshots of the affected surfaces and a short video of the feature's main
-  journey and result, captured from that candidate through authorized browser or
-  device tools. Include relevant failure and empty states.
+- Screenshots of the affected surfaces and any required flow video, captured
+  from that candidate through authorized browser or device tools. Include
+  relevant failure and empty states.
 - Independent review results, deferred findings with their scores and reasons,
   known limitations and any missing evidence with its owner.
 - Applicable preference references and how the proposal incorporates them.
 
 QA verifies the artifacts match the candidate and demonstrate the claim; the area
-lead checks completeness before chief-of-staff triage. Missing screenshots or
-video leave a product review unready. Keep working on obtainable evidence;
+lead checks completeness before chief-of-staff triage. Missing required captures
+leave a product review unready. Keep working on obtainable evidence;
 escalate an inaccessible runtime as a blocker rather than presenting old or
 synthetic captures as proof. Documentation-only and internal changes with no UX
 effect can record why product review is not applicable; never manufacture a demo for them. Retain

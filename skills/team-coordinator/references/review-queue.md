@@ -40,8 +40,10 @@ Write a JSON packet:
 }
 ```
 
-`kind` is `product`, `decision` or `idea`; only product packets require candidate,
-screenshots and video. `priority` is `urgent`, `blocked`, `review` or `idea`. The
+`kind` is `product`, `decision` or `idea`; only product packets require candidate
+and screenshots. Supply video when required by the
+[delivery evidence rules](../../pr-delivery/SKILL.md).
+`priority` is `urgent`, `blocked`, `review` or `idea`. The
 packet is bounded by the board's text and privacy guard. Submit on the claimed
 task:
 

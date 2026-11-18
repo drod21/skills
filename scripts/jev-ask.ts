@@ -44,7 +44,7 @@ import {
 } from './jev-guard.lib.ts'
 
 const USAGE =
-  'usage: node scripts/jev-ask.ts (--yes-no <q> | --pick a,b[,c,d] --question <q> | --preset flaky_or_real|blocker_or_nit|clipped_text | --check-evidence --summary <text> [--phase <checkpoint> --current-evidence <retained-path> ...]) [--context <text> | --context-file <path>] [--image <png|jpg>] [--task <id> --by <owner> | --out <dir>]'
+  'usage: node scripts/jev-ask.ts (--yes-no <q> | --pick a,b[,c,d] --question <q> | --preset flaky_or_real|blocker_or_nit|clipped_text | --check-evidence [--preflight] --summary <text> [--phase <checkpoint> --current-evidence <retained-path> ...]) [--context <text> | --context-file <path>] [--image <png|jpg>] [--task <id> --by <owner> | --out <dir>]'
 
 const LABEL = /^[a-z][a-z0-9_]{0,31}$/
 const CONTEXT_TAIL = 3000
@@ -69,6 +69,7 @@ type Mode = 'yes_no' | 'pick' | 'preset' | 'check'
 
 type AskArgs = {
   mode: Mode
+  preflight: boolean
   question: string
   labels: Record<string, string>
   preset?: keyof typeof PRESETS
@@ -126,15 +127,17 @@ function takeValues(argv: string[]) {
   const images: string[] = []
   const currentEvidence: string[] = []
   let check = false
+  let preflight = false
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index] ?? ''
     if (arg === '--check-evidence') check = true
+    else if (arg === '--preflight') preflight = true
     else if (arg === '--image') images.push(flagValue(argv, ++index, arg))
     else if (arg === '--current-evidence') currentEvidence.push(flagValue(argv, ++index, arg))
     else if (VALUE_FLAGS.has(arg)) values[arg] = flagValue(argv, ++index, arg)
     else throw new Error(`unexpected argument ${arg}\n${USAGE}`)
   }
-  return { values, images, check, currentEvidence }
+  return { values, images, check, currentEvidence, preflight }
 }
 
 function parseLabels(raw: string) {
@@ -202,8 +205,9 @@ function presetOf(values: Record<string, string>) {
 }
 
 export function parseAskArgs(argv: string[]): AskArgs {
-  const { values, images, check, currentEvidence } = takeValues(argv)
+  const { values, images, check, currentEvidence, preflight } = takeValues(argv)
   const mode = oneMode(check, values)
+  if (preflight && mode !== 'check') throw new Error('--preflight requires --check-evidence')
   assertRecording(values)
   assertModeArgs(mode, values)
   const phase = checkPhase(mode, values['--phase'], currentEvidence)
@@ -211,6 +215,7 @@ export function parseAskArgs(argv: string[]): AskArgs {
   const question = boundedQuestion(mode === 'yes_no' ? values['--yes-no'] : values['--question'])
   return {
     mode,
+    preflight,
     question: question ?? '',
     labels: values['--pick'] ? parseLabels(values['--pick']) : {},
     ...(preset && Object.hasOwn(PRESETS, preset) ? { preset: preset as keyof typeof PRESETS } : {}),
@@ -401,9 +406,9 @@ function loadOne(item: string): EvidenceItem {
 
 // At most MAX_EVIDENCE_ITEMS items and MAX_IMAGES images go out; the rest are listed as not sent.
 async function loadEvidence(items: string[], current: string[]): Promise<ReferencedEvidence[]> {
-  for (const ref of current) {
-    if (!items.includes(ref)) throw new Error('--current-evidence must match a retained task evidence path exactly')
-  }
+  const missing = current.filter((ref) => !items.includes(ref))
+  if (missing.length)
+    throw new Error(`--current-evidence must match a retained task evidence path exactly: ${missing.join(', ')}`)
   // Selection controls priority; filenames and attachment order never establish authority.
   const ordered = [
     ...items.filter((item) => current.includes(item)),
@@ -418,7 +423,7 @@ async function loadEvidence(items: string[], current: string[]): Promise<Referen
     if ('image' in loaded && ++images > MAX_IMAGES)
       loaded = { name: loaded.name, sent: false, why: 'over the image cap' }
     if (current.includes(item) && 'sent' in loaded)
-      throw new Error(`selected current evidence cannot be transmitted: ${loaded.why}`)
+      throw new Error(`selected current evidence cannot be transmitted: ${item} (${loaded.why})`)
     if (current.length) cleanText(item, 'evidence reference')
     return { ...loaded, ref: item }
   })
@@ -666,6 +671,17 @@ function printLine(line: Line) {
 async function runAsk(args: AskArgs, client: Client, exec: BoardExec): Promise<number> {
   const board = resolveBoardFile()
   const prepared = await prepare(args, exec, board)
+  if (args.preflight) {
+    console.log(
+      JSON.stringify({
+        outcome: 'preflight_ready',
+        accept: prepared.accept,
+        evidence: prepared.seen,
+        requestHash: prepared.requestHash,
+      }),
+    )
+    return 0
+  }
   const token = prepared.tool === 'check' && args.task ? randomUUID() : null
   if (token)
     exec(join(scriptDir, 'team-tasks.mjs'), [

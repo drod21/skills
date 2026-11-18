@@ -1779,7 +1779,7 @@ const packetFields = {
 }
 const reviewPacketSchema = type.or(
   { ...packetFields, kind: "'decision' | 'idea'" },
-  { ...packetFields, kind: "'product'", candidate: 'string > 0', screenshots: 'string[] > 0', video: 'string > 0' },
+  { ...packetFields, kind: "'product'", candidate: 'string > 0', screenshots: 'string[] > 0', 'video?': 'string > 0' },
 )
 
 export function parseReviewPacket(raw) {
@@ -1789,15 +1789,16 @@ export function parseReviewPacket(raw) {
   if (
     packet.kind === 'product' &&
     (!packet.screenshots.every((path) => reviewMediaType(path)?.startsWith('image/')) ||
-      !reviewMediaType(packet.video)?.startsWith('video/'))
+      (packet.video !== undefined && !reviewMediaType(packet.video)?.startsWith('video/')))
   )
-    throw new Error('review media needs PNG/JPEG/WebP screenshots and an MP4/WebM video')
+    throw new Error('review media needs PNG/JPEG/WebP screenshots and, if supplied, an MP4/WebM video')
   return packet
 }
 
 function assertReviewMedia(packet, task) {
   if (packet.kind === 'product') {
-    for (const path of [...packet.screenshots, packet.video]) {
+    const media = packet.video ? [...packet.screenshots, packet.video] : packet.screenshots
+    for (const path of media) {
       if (!task.evidence?.includes(path)) throw new Error('review media must already be attached as task evidence')
     }
   }
