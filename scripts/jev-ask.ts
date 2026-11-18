@@ -19,7 +19,6 @@ import { image, TypeSafeClient } from '@typesafe-ai/sdk'
 
 import {
   ASK_THRESHOLDS,
-  GAPS,
   PRESETS,
   buildAskRequest,
   buildCheckRequest,
@@ -409,13 +408,9 @@ async function loadEvidence(items: string[], current: string[]): Promise<Referen
   const missing = current.findIndex((ref) => !items.includes(ref))
   if (missing !== -1)
     throw new Error(`--current-evidence must match a retained task evidence path exactly (selection ${missing + 1})`)
-  // Selection controls priority; filenames and attachment order never establish authority.
-  const ordered = [
-    ...items.filter((item) => current.includes(item)),
-    ...items.filter((item) => !current.includes(item)),
-  ]
+  const selected = current.length ? items.filter((item) => current.includes(item)) : items
   let images = 0
-  return ordered.map((item, index) => {
+  return selected.map((item, index) => {
     let loaded: EvidenceItem =
       index >= MAX_EVIDENCE_ITEMS
         ? { name: basename(item), sent: false, why: 'over the evidence item cap' }
@@ -514,7 +509,7 @@ function requestFor(
     cleanText(args.summary, 'summary'),
     items,
     args.phase !== undefined
-      ? { phase: cleanText(args.phase, 'phase'), currentEvidence: args.currentEvidence }
+      ? cleanText(args.phase, 'phase')
       : undefined,
   )
 }
@@ -556,29 +551,14 @@ async function prepare(args: AskArgs, exec: BoardExec, board: string): Promise<P
     taskTitle: taskTitle(task),
     hasImage: hasSentImage(images, items),
     accept: taskAccept(task),
-    seen: items.map((item) => seenLine(item, args.currentEvidence)),
+    seen: items.map((item) => seenLine(item, args.phase !== undefined)),
   }
 }
 
-function seenLine(item: ReferencedEvidence, current: string[]) {
-  const role = current.length ? (current.includes(item.ref) ? ' [current]' : ' [historical]') : ''
+function seenLine(item: ReferencedEvidence, scoped: boolean) {
+  const role = scoped ? ' [current]' : ''
   if ('sent' in item) return `${item.ref}${role} (not sent: ${item.why})`
   return `${item.ref}${role} (${'image' in item ? 'image' : 'excerpt'})`
-}
-
-// Jev answers a check with a probability and a gap label only, never a per-clause reason, so an
-// unconfirmed check prints the accept text beside the evidence Jev saw for the worker to compare.
-function explainCheck(prepared: Prepared, outcome: AskOutcome | CheckOutcome) {
-  if (prepared.tool !== 'check' || outcome.outcome === 'confirmed') return
-  const gap = 'gap' in outcome && outcome.gap ? `${outcome.gap}: ${GAPS[outcome.gap]}` : 'none'
-  console.error(
-    [
-      `Jev did not confirm the evidence (gap ${gap}). Jev names no failing clause; compare each clause below with the evidence it saw.`,
-      `Accept: ${prepared.accept}`,
-      `Evidence Jev saw (${prepared.seen.length}):`,
-      ...prepared.seen.map((line) => `  - ${line}`),
-    ].join('\n'),
-  )
 }
 
 type Line = {
@@ -699,7 +679,6 @@ async function runAsk(args: AskArgs, client: Client, exec: BoardExec): Promise<n
       if (args.task) record(prepared, cached, null, exec)
       settled = true
       printLine({ ...lineFrom(cached, prepared), cached: true })
-      explainCheck(prepared, cached)
       return exitFor(cached.outcome, false)
     }
     let response: Awaited<ReturnType<Client['systemOne']>>
@@ -723,7 +702,6 @@ async function runAsk(args: AskArgs, client: Client, exec: BoardExec): Promise<n
     if (args.task) record(prepared, outcome, answers, exec)
     settled = true
     printLine(line)
-    explainCheck(prepared, outcome)
     return exitFor(outcome.outcome, false)
   } finally {
     // Failed recording or a process crash remains blocked until release/reap.

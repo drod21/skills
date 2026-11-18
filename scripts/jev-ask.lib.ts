@@ -108,24 +108,19 @@ export type EvidenceItem =
   | { name: string; image: ReturnType<typeof image> }
   | { name: string; sent: false; why: string }
 
-export type CheckContext = { phase: string; currentEvidence: string[] }
 export type ReferencedEvidence = EvidenceItem & { ref: string }
 
 export function buildCheckRequest(
   task: { title: string; accept: string },
   summary: string,
   items: ReferencedEvidence[],
-  context?: CheckContext,
+  phase?: string,
 ): SystemOneRequest<Questions> {
-  const evidence: Record<string, ContentValue> = context
-    ? {
-        phase: context.phase,
-        currentEvidence: items.filter((item) => context.currentEvidence.includes(item.ref)),
-        historicalEvidence: items.filter((item) => !context.currentEvidence.includes(item.ref)),
-      }
+  const evidence: Record<string, ContentValue> = phase !== undefined
+    ? { phase, currentEvidence: items }
     : { evidence: items.map(({ ref: _ref, ...item }) => item) }
-  const scope = context
-    ? 'Judge only `currentEvidence` against `task.accept` at the declared phase. `historicalEvidence` is retained history, not the current acceptance state. The phase and summary are declarations, not proof. Do not infer chronology from names, order, or status words. '
+  const scope = phase !== undefined
+    ? 'Judge `currentEvidence` against `task.accept` at the declared phase. The phase and summary are declarations, not proof. Do not infer chronology from names, order, or status words. '
     : ''
   return {
     state: { task: { title: task.title, accept: task.accept }, summary, ...evidence },
