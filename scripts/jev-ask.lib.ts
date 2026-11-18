@@ -111,7 +111,7 @@ export type EvidenceItem =
 export type ReferencedEvidence = EvidenceItem & { ref: string }
 
 export function buildCheckRequest(
-  task: { title: string; accept: string },
+  task: { title: string; accept: string; candidate?: string },
   summary: string,
   items: ReferencedEvidence[],
   phase?: string,
@@ -123,7 +123,7 @@ export function buildCheckRequest(
     ? 'Judge `currentEvidence` against `task.accept` at the declared phase. The phase and summary are declarations, not proof. Do not infer chronology from names, order, or status words. '
     : ''
   return {
-    state: { task: { title: task.title, accept: task.accept }, summary, ...evidence },
+    state: { task, summary, ...evidence },
     questions: {
       fits: noul(`${scope}Does the attached evidence show that \`task.accept\` passed?`),
       gap: choice(`${scope}Which gap label fits the evidence against the acceptance check?`, GAPS),

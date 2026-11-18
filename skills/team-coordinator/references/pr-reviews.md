@@ -53,11 +53,14 @@ separate issue. Always diff against the pinned base.
 
 ## Route the team and consult the advisor
 
-Use the Jev routing command before each new reviewer, advisor, helper or re-check
-dispatch. Fast deterministic forks go through Jev too: use an existing command
-directly when it returns `deterministic_script`; otherwise resolve the returned
-route against the live executor catalog (`--available <catalog file>`) and
-dispatch the verdict's `executor`. It is a recommendation, not permission to
+Run a known command directly when the operation is deterministic. Route reviewer,
+advisor or helper dispatches against the live executor catalog
+(`--available <catalog file>`). For equivalent standalone review dispatches,
+pass `--reuse-dir <task-owned dir> --reuse-risk <label>` on the first route and
+subsequent re-check. Reuse the label only while role, review scope, risk and
+requested executor constraints are equivalent. A material change needs a fresh
+route. The reused decision selects an executor; still run a fresh independent
+review of affected behavior. The verdict is a recommendation, not permission to
 invent an unavailable provider or model. Honor explicit model choices and report
 unavailability to the lead under the coordinator's replacement rules. Retain the
 routing receipt or bounded unavailability evidence. Do not change thresholds or

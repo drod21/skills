@@ -228,6 +228,30 @@ describe('jev-ask CLI', { timeout: 60_000 }, () => {
     ]
   }
 
+  it('keeps a scoped verdict after a supporting attachment but blocks changed proof', async () => {
+    const file = board()
+    const proof = retain(file, 'proof.txt', 'The label is whole.')
+    const output = capture()
+    const script = join(import.meta.dirname, 'team-tasks.mjs')
+    const args = checkArgs('acceptance', [proof])
+    const client = { systemOne: async () => ({ answers: { fits: { noul: 0.9 }, gap: gap('fits', 0.8) } }) }
+    try {
+      expect(await main(args, { client })).toBe(0)
+      const { receipt } = JSON.parse(String(output.log.mock.calls.at(-1)?.[0]))
+      const env = { ...process.env, TEAM_TASKS_FILE: file }
+      execFileSync(process.execPath, [script, 'evidence', '1', '--supporting', receipt], { env, stdio: 'pipe' })
+      const snapshot = readFileSync(file, 'utf8')
+      const done = () => spawnSync(process.execPath, [script, 'done', '1', '--owner', 'qa-1'], { env, encoding: 'utf8' })
+      const first = done()
+      expect(first.status, first.stderr).toBe(0)
+      writeFileSync(file, snapshot)
+      writeFileSync(proof, 'The label is clipped.')
+      expect(done().stderr).toContain('selected evidence changed')
+    } finally {
+      output.restore()
+    }
+  })
+
   it.each([false, true])(
     'separates old BLOCKED/no PR history from current merged proof (reversed=%s)',
     async (reverse) => {

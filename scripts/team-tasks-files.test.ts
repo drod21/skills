@@ -31,6 +31,8 @@ describe('the board CLI file set', () => {
     const files = closure('team-tasks.mjs')
     expect(files).toEqual(
       [
+        'board-git-proof.mjs',
+        'evidence-scope.mjs',
         'review-queue.mjs',
         'jev-executors.catalog.mjs',
         'team-board-delivery.mjs',

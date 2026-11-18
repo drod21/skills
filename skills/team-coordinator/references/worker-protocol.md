@@ -73,19 +73,24 @@ absolute script paths even when editing in another checkout.
    not show it, look at screen wiring and data-ready timing first.
 6. **Complete.** `node "$TOOLKIT/scripts/team-tasks.mjs" done <id> --owner
    <your-owner-id> [--evidence <item>]` only after the agreed deliverable and its
-   acceptance checks pass. On a task with `accept`, run `jev-ask.ts
+   acceptance checks pass. On a task with pinned `gitProof`, run
+   `verify-git <id> --by <owner>` before `done`. On a task with `accept`, run `jev-ask.ts
    --check-evidence --summary <text> --task <id> --by <your-owner>` as the last
-   Jev call, then `done`. When historical reports coexist with current proof, add
+   Jev call, then `done`. For mixed Git and Jev tasks or when historical reports
+   coexist with current proof, add
    `--phase "merged acceptance" --current-evidence <retained-path>` (repeat the
    flag per receipt, both flags together, exact stored paths from `show <id>`,
    not basenames or original temp paths). Phase and summary are declarations, not
-   proof; unselected attachments stay as history; selected receipts take priority
-   within the existing caps; an unreadable, guarded, over-cap or out-of-range
+   proof. A phased check sends only selected receipts within the existing caps.
+   Use `evidence <id> --supporting <path>` for a receipt or handoff that carries
+   no acceptance input. Attach new acceptance evidence before checking again.
+   The board revalidates selected file hashes before completion.
+   An unreadable, guarded, over-cap or out-of-range
    image refuses before any provider call. Each image side must be 280 to 1568
    pixels; resize with `sips -Z 1568`.
 
    A later `decide`, answered ask, release or reap invalidates that check, and so
-   does new evidence: attach every item with `evidence` before the check, not
+   does new acceptance evidence: attach it with `evidence` before the check, not
    with `done --evidence` after it. If one of those lands while the check waits on
    Jev, the board refuses the check and `jev-ask` exits 1; run it again. The latest
    check decides: a rejected or held check after a confirmed one blocks `done`

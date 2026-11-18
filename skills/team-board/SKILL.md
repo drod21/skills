@@ -61,7 +61,7 @@ Plan: `add <role> <title...> [--after id,id] [--route r] [--accept text] [--tag 
 
 Run: `claim <role> <owner> [--id n] [--run kind:ref] [--wake thread]`,
 `heartbeat <id> [--owner o] [--run kind:ref] [--wake thread]`, `lead-wake <thread>
-[--task n | --tag t] --by who` (and `--clear`), `evidence <id> <item...>`,
+[--task n | --tag t] --by who` (and `--clear`), `evidence <id> [--supporting] <item...>`,
 `judgment <id> <json>`, `decide <id> --summary text [--ref path] [--by who]`,
 `accept <id> --reason text --by lead`, `done <id> [--owner o] [--evidence item]`,
 `release <id>`, `reap --older-than <hours> [--role r] [--include-untimed]`.
@@ -89,9 +89,16 @@ Upkeep: `archive --older-than-days <n>` or `archive --id <id>`, `doctor --fix`.
 - `--by jev` is reserved for Jev verdicts. `--ref` and `--by` are trimmed; blank
   values are refused. `route` needs `--reason` whenever it overrides a verdict or
   a held route.
-- A later `decide`, answered ask, release, reap, new evidence, a note on a done
+- A later `decide`, answered ask, release, reap, new acceptance evidence, a note on a done
   task or a review update voids an earlier acceptance check; the next claim needs
   a fresh one.
+- `evidence <id> --supporting <path>` retains receipts or handoff material that
+  carries no acceptance input. It cannot satisfy or invalidate the acceptance
+  gate. For phased checks, `done` revalidates the selected file hashes.
+- To require objective Git or GitHub Actions proof, the lead pins the requirement
+  at `add ... --git-proof <plan.json>`. The claim owner runs
+  `verify-git <id> --by <owner>`. A mixed task also needs a phased Jev check
+  tied to that candidate. See the [proof plan fields](../team-coordinator/references/jev-team.md#mechanical-proof).
 - A temp-directory path passed to `evidence`, `done --evidence` or `decide --ref`
   is copied beside the board (up to 25 MiB); other paths, URLs and notes are
   stored as given.

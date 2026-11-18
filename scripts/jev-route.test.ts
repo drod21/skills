@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -23,6 +23,28 @@ import {
 } from './jev-route.lib.ts'
 
 const task = { role: 'ux-worker' }
+
+it('reuses a review route only for the same risk, role and live catalog', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'jev-reuse-'))
+  let calls = 0
+  const client = { systemOne: async () => {
+    calls += 1
+    return { answers: answers(0, 0, { mechanical: 0.95 }) }
+  } } as unknown as Pick<TypeSafeClient, 'systemOne'>
+  try {
+    const options = { reuse: { dir, risk: 'same-review-risk' }, availability: { available: new Set<string>() }, log: () => {} }
+    await routeTasks([{ title: 'Check the initial candidate', ...task }], client, options)
+    const [again] = await routeTasks([{ title: 'Recheck the follow-up', ...task }], client, options)
+    expect(again?.decision.route).toBe('deterministic_script')
+    expect(calls).toBe(1)
+    await routeTasks([{ title: 'Recheck', ...task }], client, { ...options, availability: { available: new Set(['codex:example']) } })
+    await routeTasks([{ title: 'Recheck', ...task }], client, { ...options, reuse: { dir, risk: 'changed-risk' } })
+    await routeTasks([{ title: 'Recheck', role: 'qa-worker' }], client, options)
+    expect(calls).toBe(4)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
 
 // Probability mass split between the two levels around the score, unless the test gives it.
 function scoreAnswer(score: number, confidence = 0.9, given?: [number, number, number]) {

@@ -63,3 +63,32 @@ the full evidence snapshot and freshness checks when journaling the judgment.
 For a rejected check or hold, use the result's gap and receipt path. The receipt
 contains the acceptance criteria and exact request. Use preflight to inspect the
 artifact manifest before submitting a revised packet.
+
+Keep a receipt or handoff that carries no acceptance input with
+`evidence <id> --supporting <path>`. That material is stored separately from
+acceptance evidence. A phased check hashes its selected retained files (up to
+25 MiB each) and binds them to
+the task criteria. Changes to those files or the criteria require a fresh
+check. Attach new acceptance evidence through plain `evidence` before checking.
+
+## Mechanical proof
+
+For a mechanical task, the lead can add `--git-proof <plan.json>` in place of
+`--accept`. Set `repo` to the absolute checkout root and `candidate` to the full
+reviewed commit SHA. The verifier compares checkout HEAD with that commit.
+For a squash merge, also set `base`, `landed` and `target` to the pinned base
+SHA, squash SHA and full local or remote-tracking ref. Fetch the target first
+when relevant. The verifier checks ancestry, parent and tree identity.
+
+To require a GitHub Actions result, add a `ci` object with `repository`
+(`owner/repo`), numeric `workflow`, `run` and `attempt` IDs, `workflowPath`,
+`workflowCommit` and the exact `job` and `step` names. Pin the workflow commit
+from trusted source. The verifier compares the candidate workflow blob against
+it, then uses read-only GitHub Actions data to require a successful same-repo
+push run, job and step at the candidate SHA. For a squash proof, set
+`ci.on` to `landed` to verify the run at the squash SHA instead. The lead
+chooses a workflow that checks out and tests the specified commit.
+
+Run `verify-git <id> --by <claim-owner>` before `done`. Set both `--git-proof`
+and `--accept` for mixed tasks and also pass a phased Jev check whose selected
+evidence covers the semantic criteria at the pinned candidate.

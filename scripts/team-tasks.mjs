@@ -38,10 +38,12 @@ import {
   noteToLead,
   ownerInbox,
   parseReviewPacket,
+  prepareGitProof,
   readAnswer,
   readArchiveMap,
   readBoard,
   readNote,
+  recordGitProof,
   recordReview,
   reviewReport,
   reapClaims,
@@ -100,7 +102,9 @@ const USAGE = [
   '                                          A temp file is copied beside the board before the lock.',
   '                                          On an already-done task with an owner, --owner must match',
   '                                          unless --force',
-  '  evidence <id> <item...>                 append paths or URLs. A temp file is copied beside the board.',
+  '  evidence <id> [--supporting] <item...>  attach paths or URLs. Supporting items are outside acceptance.',
+  '  add ... --git-proof <file.json>       pin a Git proof requirement, optionally with --accept for mixed work.',
+  '  verify-git <id> --by <owner>          verify the pinned Git proof mechanically.',
   '  review <id> <file.json> --by <owner>    record scored findings; retains every prior finding ID.',
   '  review-report <id>                     print all findings and every unfixed comment.',
   '  add ... --review                      require a scored review before done (empty findings allowed).',
@@ -377,10 +381,12 @@ const COMMANDS = {
     const reason = takeFlag(args, '--reason')
     const by = takeFlag(args, '--by')
     const accept = takeFlag(args, '--accept')
+    const proofFile = takeFlag(args, '--git-proof')
+    const gitProof = proofFile ? JSON.parse(readFileSync(proofFile, 'utf8')) : null
     const tag = takeFlag(args, '--tag')
     const review = takeSwitch(args, '--review')
     const [role, ...title] = args
-    const input = { role, title: title.join(' '), after, route, jev, reason, by, accept, tag, review }
+    const input = { role, title: title.join(' '), after, route, jev, reason, by, accept, gitProof, tag, review }
     out(withBoard(file, (board) => addTask(board, input)))
   },
   jev(file, args) {
@@ -431,10 +437,18 @@ const COMMANDS = {
     out(withBoard(file, (board) => done(board, stored)))
   },
   evidence(file, args) {
+    const supporting = takeSwitch(args, '--supporting')
     const id = requireId(args)
-    const add = (board, items) => addEvidence(board, id, items)
+    const add = (board, items) => addEvidence(board, id, items, { supporting })
     const stored = retained(file, id, args.slice(1), add)
     out(withBoard(file, (board) => add(board, stored)))
+  },
+  'verify-git'(file, args) {
+    const by = takeFlag(args, '--by')
+    const id = requireId(args)
+    if (args.length !== 1) throw new Error('usage: verify-git <id> --by <owner>')
+    const verified = prepareGitProof(readBoard(file), id, by)
+    out(withBoard(file, (board) => recordGitProof(board, id, verified)))
   },
   judgment(file, args) {
     const id = requireId(args)
@@ -449,6 +463,7 @@ const COMMANDS = {
       token: 'string',
       evidence: 'string[]',
       basis: 'number.integer >= 0',
+      'scope?': 'unknown',
     })
     out(withBoard(file, (board) => startEvidenceCheck(board, id, value)))
   },
