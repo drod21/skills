@@ -245,9 +245,9 @@ describe('jev-ask CLI', { timeout: 60_000 }, () => {
             state: {
               phase: 'merged acceptance',
               currentEvidence: [{ ref: current, excerpt: merged }],
-              historicalEvidence: [{ ref: historical, excerpt: blocked }],
             },
           })
+          expect(JSON.stringify(request)).not.toContain(blocked)
           expect(JSON.stringify(request)).toContain('declarations, not proof')
           return { answers: { fits: { noul: 0.9 }, gap: gap('fits', 0.8) } }
         }),
@@ -274,18 +274,20 @@ describe('jev-ask CLI', { timeout: 60_000 }, () => {
         const rejecting = {
           systemOne: async (request: unknown) => {
             expect(request).toMatchObject({
-              state: { currentEvidence: [{ excerpt: blocked }], historicalEvidence: [{ excerpt: merged }] },
+              state: { currentEvidence: [{ excerpt: blocked }] },
             })
+            expect(JSON.stringify(request)).not.toContain(merged)
             return { answers: { fits: { noul: 0.1 }, gap: gap('failing', 0.8) } }
           },
         }
         expect(await main(checkArgs('merged acceptance', [historical]), { client: rejecting })).toBe(2)
         expect(JSON.parse(String(output.log.mock.calls.at(-1)?.[0])).requestHash).not.toBe(line.requestHash)
-        const explained = String(output.error.mock.calls.at(-1)?.[0])
-        expect(explained).toContain('gap failing')
-        expect(explained).toContain('Accept: the label is whole')
-        expect(explained).toContain(`${historical} [current] (excerpt)`)
-        expect(explained).toContain(`${current} [historical] (excerpt)`)
+        const rejected = JSON.parse(String(output.log.mock.calls.at(-1)?.[0]))
+        expect(rejected).toMatchObject({ outcome: 'rejected', gap: 'failing' })
+        expect(output.error.mock.calls.flat().join('\n')).not.toContain(historical)
+        const rejectedReceipt = JSON.parse(readFileSync(rejected.receipt, 'utf8'))
+        expect(rejectedReceipt.request.state.task.accept).toBe('the label is whole')
+        expect(rejectedReceipt.request.state.currentEvidence).toMatchObject([{ ref: historical, excerpt: blocked }])
         const script = join(import.meta.dirname, 'team-tasks.mjs')
         expect(spawnSync(process.execPath, [script, 'done', '1', '--owner', 'qa-1']).status).toBe(1)
         expect(await main(args, { client })).toBe(0)
@@ -296,7 +298,7 @@ describe('jev-ask CLI', { timeout: 60_000 }, () => {
     },
   )
 
-  it('prioritizes current evidence beyond the old item cap and retains historical omissions', async () => {
+  it('excludes unselected attachments from the request and its item cap', async () => {
     const file = board()
     for (let index = 0; index < 12; index++) retain(file, `old-${index}.txt`, `History ${index}`)
     const current = retain(file, 'current.txt', 'Current label proof')
@@ -309,9 +311,7 @@ describe('jev-ask CLI', { timeout: 60_000 }, () => {
               expect(request).toMatchObject({
                 state: { currentEvidence: [{ ref: current, excerpt: 'Current label proof' }] },
               })
-              const state = (request as { state: { historicalEvidence: unknown[] } }).state
-              expect(state.historicalEvidence).toHaveLength(12)
-              expect(state.historicalEvidence.at(-1)).toMatchObject({ sent: false, why: 'over the evidence item cap' })
+              expect(JSON.stringify(request)).not.toContain('old-')
               return { answers: { fits: { noul: 0.9 }, gap: gap('fits', 0.8) } }
             },
           },
@@ -691,12 +691,12 @@ describe('jev-ask CLI', { timeout: 60_000 }, () => {
     return { answers: { fits: { noul: 0.9 }, gap: gap('fits', 0.8) } }
   }
 
-  it('omits an oversized historical screenshot and still checks the in-range image', async () => {
+  it('omits invalid screenshots in an unscoped check and still checks the in-range image', async () => {
     const file = board()
-    const historical = retain(file, 'phone.png', pngHeader(1170, 2532))
-    const current = retain(file, 'fitted.png', pngHeader(390, 844))
-    const overEdge = retain(file, 'over-edge.png', pngHeader(1569, 280))
-    const tiny = retain(file, 'tiny.png', pngHeader(100, 100))
+    retain(file, 'phone.png', pngHeader(1170, 2532))
+    retain(file, 'fitted.png', pngHeader(390, 844))
+    retain(file, 'over-edge.png', pngHeader(1569, 280))
+    retain(file, 'tiny.png', pngHeader(100, 100))
     const calls: unknown[] = []
     const client = {
       systemOne: async (request: unknown) => {
@@ -706,16 +706,12 @@ describe('jev-ask CLI', { timeout: 60_000 }, () => {
     }
     const output = capture()
     try {
-      expect(await main(checkArgs('acceptance', [current]), { client })).toBe(0)
-      const state = (
-        calls[0] as {
-          state: { currentEvidence: Record<string, unknown>[]; historicalEvidence: Record<string, unknown>[] }
-        }
-      ).state
-      expect(state.currentEvidence.map((item) => item.ref)).toEqual([current])
-      expect(state.currentEvidence[0]).toHaveProperty('image')
-      const omitted = state.historicalEvidence
-      expect(omitted.map((item) => item.ref)).toEqual([historical, overEdge, tiny])
+      const args = ['--check-evidence', '--summary', 'Acceptance checkpoint', '--task', '1', '--by', 'qa-1']
+      expect(await main(args, { client })).toBe(0)
+      const state = (calls[0] as { state: { evidence: Record<string, unknown>[] } }).state
+      expect(state.evidence.find((item) => item.name === 'fitted.png')).toHaveProperty('image')
+      const omitted = state.evidence.filter((item) => item.sent === false)
+      expect(omitted.map((item) => item.name)).toEqual(['phone.png', 'over-edge.png', 'tiny.png'])
       expect(omitted.every((item) => item.sent === false && !('image' in item))).toBe(true)
       expect(omitted[0]?.why).toContain('1170x2532')
       expect(omitted[0]?.why).toContain('sips -Z 1568')

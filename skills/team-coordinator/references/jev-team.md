@@ -54,10 +54,12 @@ before submitting the live check.
 `--phase` and repeatable `--current-evidence` are check-only and must be supplied
 together. Phase names the acceptance checkpoint; the task stays `claimed` until
 `done`. Phase and summary are declarations, not proof. Selected receipts are
-current evidence and take priority within the 12-item, four-image caps; other
-attachments remain history. Neither filenames, attachment order nor words such as
+the only evidence sent to Jev within the 12-item, four-image caps. Explicitly
+select any baseline needed for the comparison. Neither filenames, attachment order nor words such as
 "BLOCKED" establish which report is current, and a basename alone cannot select a
 retained full path. An unreadable, guarded, over-cap or out-of-range selection
-refuses before Jev is called. Text uses a 4,000-character tail; historical
-omissions are listed. Both modes retain the full evidence snapshot and freshness
-checks when journaling the judgment.
+refuses before Jev is called. Text uses a 4,000-character tail. Both modes retain
+the full evidence snapshot and freshness checks when journaling the judgment.
+For a rejected check or hold, use the result's gap and receipt path. The receipt
+contains the acceptance criteria and exact request. Use preflight to inspect the
+artifact manifest before submitting a revised packet.
