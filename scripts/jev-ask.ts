@@ -406,9 +406,9 @@ function loadOne(item: string): EvidenceItem {
 
 // At most MAX_EVIDENCE_ITEMS items and MAX_IMAGES images go out; the rest are listed as not sent.
 async function loadEvidence(items: string[], current: string[]): Promise<ReferencedEvidence[]> {
-  const missing = current.filter((ref) => !items.includes(ref))
-  if (missing.length)
-    throw new Error(`--current-evidence must match a retained task evidence path exactly: ${missing.join(', ')}`)
+  const missing = current.findIndex((ref) => !items.includes(ref))
+  if (missing !== -1)
+    throw new Error(`--current-evidence must match a retained task evidence path exactly (selection ${missing + 1})`)
   // Selection controls priority; filenames and attachment order never establish authority.
   const ordered = [
     ...items.filter((item) => current.includes(item)),
@@ -423,7 +423,7 @@ async function loadEvidence(items: string[], current: string[]): Promise<Referen
     if ('image' in loaded && ++images > MAX_IMAGES)
       loaded = { name: loaded.name, sent: false, why: 'over the image cap' }
     if (current.includes(item) && 'sent' in loaded)
-      throw new Error(`selected current evidence cannot be transmitted: ${item} (${loaded.why})`)
+      throw new Error(`selected current evidence cannot be transmitted (selection ${current.indexOf(item) + 1}): ${loaded.why}`)
     if (current.length) cleanText(item, 'evidence reference')
     return { ...loaded, ref: item }
   })
@@ -672,11 +672,13 @@ async function runAsk(args: AskArgs, client: Client, exec: BoardExec): Promise<n
   const board = resolveBoardFile()
   const prepared = await prepare(args, exec, board)
   if (args.preflight) {
+    const evidence = prepared.seen.map((line) => cleanText(line, 'evidence manifest line'))
+    assertApiKeyAbsent(evidence)
     console.log(
       JSON.stringify({
         outcome: 'preflight_ready',
         accept: prepared.accept,
-        evidence: prepared.seen,
+        evidence,
         requestHash: prepared.requestHash,
       }),
     )
