@@ -60,7 +60,9 @@ the only evidence sent to Jev within the 12-item, four-image caps. Explicitly
 select any baseline needed for the comparison. Neither filenames, attachment order nor words such as
 "BLOCKED" establish which report is current, and a basename alone cannot select a
 retained full path. An unreadable, guarded, over-cap or out-of-range selection
-refuses before Jev is called. Text uses a 4,000-character tail. Both modes retain
+refuses before Jev is called, and so does any retained file whose bytes no longer
+match its checksum directory, preflight included. An image reference token
+(`<image:...>`) quoted in text is sent as `[image reference]`. Text uses a 4,000-character tail. Both modes retain
 the full evidence snapshot and freshness checks when journaling the judgment.
 For a rejected check or hold, use the result's gap and receipt path. The receipt
 contains the acceptance criteria and exact request. Use preflight to inspect the
