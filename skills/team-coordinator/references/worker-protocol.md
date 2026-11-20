@@ -15,7 +15,9 @@ The chief of staff consolidates human decisions across leads.
 absolute script paths even when editing in another checkout.
 
 1. **Read scope, inspect the tree.** Read the assigned scope and inspect the
-   working tree before edits. Load the role skill and the project's task map and
+   working tree before edits. Create and edit files with the harness's edit or
+   write tool, not a heredoc, `tee` or shell redirect: projects often block shell
+   writes to tracked files, and the retry costs a round trip. Load the role skill and the project's task map and
    command skill before any check, build or runtime action. Preserve an assigned
    checkout and verify its pinned head. For a new unit branch, branch from the
    verified remote default branch and report if it is behind; carry another
@@ -43,7 +45,14 @@ absolute script paths even when editing in another checkout.
    builder stops that part, reports the test, reason and evidence to the lead and
    carries on with the rest. A test worker writes the tests and the minimal
    contract they compile against, never the implementation, and is the only worker
-   who amends a locked test, in its own commit, when the lead assigns it.
+   who amends a locked test, in its own commit, when the lead assigns it. Before
+   committing the lock, the test worker runs the existing tests for the affected
+   source; an older test that asserts the opposite of a numbered decision is
+   amended or removed in the lock commit, citing the decision number, and listed
+   in the return ("none" with the command run when there is none). A builder who
+   still meets an older test that contradicts a locked one follows the locked
+   test, reports the older test to the lead with the decision it contradicts,
+   and carries on with the rest.
 4. **Work inside the boundary and follow the escalation chain.** Resolve known
    facts first, consult Jev for unresolved semantic judgments, then escalate to
    the parent lead. Ask Jev yourself with `node "$TOOLKIT/scripts/jev-ask.ts"
