@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_PORT, readConfig, tailnetFrom } from './board-config.server'
 
@@ -37,6 +37,11 @@ describe('readConfig', () => {
       buildSha: 'abc1234',
       port: 4791,
     })
+  })
+
+  it("takes the project from the board file's directory, and resolves a relative project", () => {
+    expect(readConfig({ TEAM_TASKS_FILE: '/work/project/tasks.json' }).project).toBe('/work/project')
+    expect(readConfig({ TEAM_BOARD_PROJECT: 'rel/project' }).project).toBe(resolve('rel/project'))
   })
 
   it("reads the board from the project's checkout unless TEAM_TASKS_FILE names another", () => {

@@ -162,5 +162,5 @@ task, and a settings page for the lead's thread. It shells out to `team-tasks.mj
 applies; the UI cannot do anything the CLI refuses. Start it from the project checkout (see `AGENTS.md`,
 "Using the toolkit in a project"), or set `TEAM_BOARD_PROJECT` to that checkout: it is where the board file
 defaults to (`tasks.json`, unless `TEAM_TASKS_FILE` names another) and the T3 project whose threads the lead
-picker lists. It defaults to the working directory. Browser checks: `pnpm --filter @derek-skills/board test:browser`; they are time-sensitive
+picker lists. It defaults to the directory of `TEAM_TASKS_FILE` when that is set, else the working directory. Browser checks: `pnpm --filter @derek-skills/board test:browser`; they are time-sensitive
 and flake on a loaded host, so rerun a failing spec alone before treating it as a regression.
