@@ -1412,6 +1412,21 @@ describe('verdict and evidence edges', () => {
     expect(readFileSync(board, 'utf8')).toBe(before)
   })
 
+  it('lists every command and every flag its handler reads in FLAGS', () => {
+    const source = readFileSync(CLI, 'utf8')
+    const commands = source.slice(source.indexOf('const COMMANDS = {'))
+    const flags = source.slice(source.indexOf('const FLAGS = {'), source.indexOf('const FLAG_SHAPE'))
+    const keys = (text: string, shape: RegExp) => [...new Set([...text.matchAll(shape)].map((match) => match[1]))].sort()
+    // A FLAGS key line: "  'lead-wake': [" matches; "  add(file, args) {" does not.
+    const flagKey = /^ {2}'?([a-z-]+)'?: \[/gm
+    // A COMMANDS key line: "  add(", "  async doctor(" and "  inbox: " match; "    const by" does not.
+    const commandKey = /^ {2}(?:async )?'?([a-z-]+)'?(?:\(|: )/gm
+    // A literal flag read: "takeFlag(args, '--by')" matches; "takeFlag(args, name)" does not.
+    const flagRead = /take(?:Flag|Switch|AllFlags)\(args, '(--[a-z-]+)'\)/g
+    expect(keys(flags, flagKey)).toEqual(keys(commands, commandKey))
+    expect(keys(commands, flagRead).filter((flag) => !flags.includes(`'${flag}'`))).toEqual([])
+  })
+
   it('keeps dashes inside free text', () => {
     seed(task(1, { status: 'claimed', owner: 'w1' }))
     expect(cli('ask-owner', '1', 'Ship', '--', 'or', 'wait?', '--by', 'w1').status).toBe(0)
