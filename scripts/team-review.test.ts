@@ -10,6 +10,8 @@ import {
   reviewReport,
   addEvidence,
   addJudgment,
+  acceptEvidence,
+  ownerGate,
 } from './team-tasks.lib.mjs'
 import { hashRequest, toJudgment } from './jev-ask.lib.ts'
 
@@ -106,6 +108,40 @@ describe('scored reviews', () => {
     recordReview(board, task.id, parseReview({ findings: [finding(2, 10, 'fixed')] }), 'reviewer')
     expect(() => doneTask(board, task.id, { force: true })).toThrow(/Unconfirmed/)
     addJudgment(board, task.id, check(task.decisions.length))
+    doneTask(board, task.id, { owner: 'reviewer' })
+    expect(task.completionReport.unfixed).toEqual([])
+  })
+
+  it('drops a held check once a later review decision changes what it judged', () => {
+    const board = { tasks: [] }
+    const task = addTask(board, { role: 'qa-worker', title: 'Review', review: true, accept: 'Findings resolved' })
+    claimTask(board, 'qa-worker', 'reviewer', { id: task.id })
+    addEvidence(board, task.id, ['evidence.log'])
+    const hold = (basis: number) =>
+      JSON.stringify(
+        toJudgment(
+          'check',
+          { outcome: 'hold', gap: 'fits', p: 0.95, reasons: [] },
+          {
+            by: 'reviewer',
+            question: 'Resolved?',
+            requestHash: hashRequest('review-test'),
+            receipt: 'receipt.json',
+            evidence: task.evidence,
+            basis,
+          },
+        ),
+      )
+    recordReview(board, task.id, parseReview({ findings: [finding(2, 10)] }), 'reviewer')
+    addJudgment(board, task.id, hold(task.decisions.length))
+    expect(ownerGate(task)?.why).toBe('hold')
+    recordReview(board, task.id, parseReview({ findings: [finding(2, 10, 'fixed')] }), 'reviewer')
+    expect(ownerGate(task)).toBeNull()
+    expect(() => acceptEvidence(board, task.id, { reason: 'Read the old receipt', by: 'lead' })).toThrow(
+      /run the check again/,
+    )
+    addJudgment(board, task.id, hold(task.decisions.length))
+    acceptEvidence(board, task.id, { reason: 'Read the new receipt', by: 'lead' })
     doneTask(board, task.id, { owner: 'reviewer' })
     expect(task.completionReport.unfixed).toEqual([])
   })

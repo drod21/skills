@@ -14,6 +14,7 @@ import {
   addJudgment,
   addTask,
   claimTask,
+  abandonStaleEvidenceCheck,
   decideTask,
   doneTask,
   endEvidenceCheck,
@@ -32,6 +33,25 @@ const START_MS = Date.UTC(2026, 0, 1)
 // Built at run time: the pre-push leak scan refuses a literal 64-hex string.
 const REQUEST_HASH = '0'.repeat(64)
 
+it('refuses a late check after evidence is added and frees the slot for a fresh check', () => {
+  const board = { tasks: [] }
+  const t = addTask(board, { role: ROLE, title: 'Review', accept: 'Evidence checked' })
+  const by = WORKERS[0]
+  claimTask(board, ROLE, by, { id: t.id })
+  const evidence = [EVIDENCE[0]]
+  addEvidence(board, t.id, evidence)
+  const snapshot = { by, token: 'previous-check', evidence, basis: (t.decisions ?? []).length }
+  startEvidenceCheck(board, t.id, snapshot)
+  addEvidence(board, t.id, [EVIDENCE[1]])
+
+  expect(() => addJudgment(board, t.id, judgmentPayload('check', by, 'confirmed', snapshot))).toThrow(
+    /evidence changed/,
+  )
+  abandonStaleEvidenceCheck(board, t.id, snapshot)
+  expect(t.pendingChecks).toBeUndefined()
+  startEvidenceCheck(board, t.id, { ...snapshot, token: 'fresh-check', evidence: [...EVIDENCE] })
+})
+
 type Task = {
   id: number
   status: string
@@ -48,7 +68,8 @@ type Pending = { by: string; evidence: string[]; basis: number; voidedBy: string
 
 // The ghost: what the rules say from the commands that ran, never read from the journal. A release, a lead
 // choice, or an answered ask or decide voids every earlier judgment, and marks a check still in flight.
-// `lastCheck` is the most recent check to land on the board, whatever its evidence: accept answers only that one.
+// `lastCheck` is the most recent check since a decision changed what was reviewed, whatever its evidence: accept
+// answers only that one. Release and reap keep it so the lead can still resolve a hold for the same evidence.
 type Ghost = {
   verdicts: Record<string, Verdict>
   holdOpen: boolean
@@ -79,6 +100,7 @@ const currentKey = (world: World) => evidenceKey(task(world.board).evidence ?? [
 
 function voidJudgments(ghost: Ghost, cause: string) {
   ghost.verdicts = {}
+  if (cause !== 'a release' && cause !== 'a reap') ghost.lastCheck = null
   if (ghost.pending) ghost.pending.voidedBy ??= cause
 }
 
@@ -123,7 +145,13 @@ function startCheck(world: World, by: string) {
 function checkMustLand(world: World) {
   const t = task(world.board)
   const pending = world.ghost.pending
-  return Boolean(pending && !pending.voidedBy && t.status === 'claimed' && t.owner === pending.by)
+  return Boolean(
+    pending &&
+      !pending.voidedBy &&
+      t.status === 'claimed' &&
+      t.owner === pending.by &&
+      evidenceKey(pending.evidence) === currentKey(world),
+  )
 }
 
 // jev-ask.ts `record`: the judgment carries the snapshot taken at `prepare`. If the board refuses it, jev-ask

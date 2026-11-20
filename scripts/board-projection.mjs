@@ -85,11 +85,13 @@ function ownerGate(decisions, evidence) {
 }
 
 // The latest check stands only for the evidence it judged. A held check waits on the lead's
-// accept (acceptEvidence takes it even after a release or a voided accept). A rejection waits on
-// new evidence or the lead, until a release hands the task back to the pool.
+// accept (acceptEvidence takes it even after a release or a voided accept) until any other
+// invalidator changes what it judged. A rejection waits on new evidence or the lead, until a
+// release hands the task back to the pool.
 function checkGate(check, later, evidence) {
   if (!sameEvidence(check, evidence)) return null
-  if (check.outcome === 'hold') return { why: 'hold', entry: check }
+  if (check.outcome === 'hold' && !later.some((l) => l.kind !== 'release' && isInvalidator(l)))
+    return { why: 'hold', entry: check }
   if (check.outcome === 'rejected' && !later.some((l) => l.kind === 'release')) return { why: 'rejected', entry: check }
   return null
 }
