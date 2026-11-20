@@ -274,7 +274,7 @@ function runT3(config: Config, args: string[]): Promise<Outcome<string>> {
 
 /** This project's top-level T3 threads, newest first. */
 export async function listThreads(config: Config): Promise<Outcome<ThreadListItem[]>> {
-  const listed = await runT3(config, ['thread', 'list', '--project', config.repo, '--json'])
+  const listed = await runT3(config, ['thread', 'list', '--project', config.project, '--json'])
   if (!listed.ok) return listed
   const parsed = T3Threads(listed.value)
   if (parsed instanceof type.errors) {
