@@ -526,13 +526,12 @@ function artifactName(item) {
   return base && base !== '.' && base !== '..' ? base : 'file'
 }
 
+// A missing, special or changed destination is a mismatch, so the copy below replaces it.
 function retainedBytesMatch(path, bytes) {
   try {
-    const stat = lstatSync(path)
-    return stat.isFile() && stat.size === bytes.length && readFileSync(path).equals(bytes)
-  } catch (error) {
-    if (error?.code === 'ENOENT') return false
-    throw error
+    return readEvidenceFile(path).equals(bytes)
+  } catch {
+    return false
   }
 }
 
@@ -1518,7 +1517,7 @@ export function acceptEvidence(board, id, { reason, by, now = new Date() } = {})
   const decisions = decisionEntries(task)
   if (decisions.slice(decisions.lastIndexOf(check) + 1).some(invalidatesHeldCheck))
     throw new Error(`task ${task.id} decisions changed since the last check; run the check again`)
-  assertRetainedEvidence(task)
+  if (task.accept) assertRetainedEvidence(task)
   assertEvidenceScope(task, check.scope)
   const decision = { kind: 'accept', at: now.toISOString(), by: cleanedBy, reason: trimmed, evidence, ...(check.scope && { scope: check.scope }) }
   appendDecision(task, decision)

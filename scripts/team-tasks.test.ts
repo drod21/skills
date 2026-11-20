@@ -2005,6 +2005,22 @@ describe('done gate', () => {
     expect(byId(1).decisions ?? []).toEqual([])
   })
 
+  it('accepts a hold on an ungated task whose evidence is a local file it never retained', () => {
+    const local = join(dir, 'notes.md')
+    writeFileSync(local, 'checked by hand\n')
+    seed(
+      task(1, {
+        status: 'claimed',
+        owner: 'worker',
+        evidence: [local],
+        decisions: [judgment({ outcome: 'hold', answer: null, evidence: [local] })],
+      }),
+    )
+    const result = cli('accept', '1', '--reason', 'because', '--by', 'lead')
+    expect(result.stderr).toBe('')
+    expect(result.status).toBe(0)
+  })
+
   it('accept refuses a rejected check, a confirmed check, no check, and empty evidence', () => {
     seed(task(1, { status: 'claimed', owner: 'worker', accept: 'labels fit', evidence: ['a.png'] }))
     expect(cli('accept', '1', '--reason', 'because', '--by', 'lead').stderr).toContain('no check')

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { type } from 'arktype'
 
 const boardOverride = type('string | undefined')
@@ -8,7 +8,7 @@ const boardOverride = type('string | undefined')
 // else tasks.json beside the repository's common git dir (worktrees share one board), else ./tasks.json.
 export function resolveBoardFile() {
   const override = boardOverride.assert(process.env.TEAM_TASKS_FILE)
-  if (override) return override
+  if (override) return resolve(override)
   const cwd = process.cwd()
   try {
     const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
