@@ -78,6 +78,9 @@ Upkeep: `archive --older-than-days <n>` or `archive --id <id>`, `doctor --fix`.
 
 ## Gating rules worth knowing
 
+- A flag the command does not read is refused before anything runs, with the
+  command's usage: `evidence 1 --by x` prints `evidence takes no --by`. Pass
+  free text as one quoted argument; a bare `--word` argument is read as a flag.
 - `claim` refuses while a dependency is open; a plain claim never picks route
   `lead_workflow` or `needs_lead`. `claim --id n` takes exactly that task or fails
   and changes nothing.

@@ -218,6 +218,62 @@ function takeAllFlags(args, name) {
   }
 }
 
+// The flags and switches each command reads. A separate argument shaped like a flag that is not listed is
+// refused with the command's usage, so a wrong flag never reaches an item check or becomes part of a text.
+const FLAGS = {
+  add: ['--after', '--route', '--jev', '--reason', '--by', '--accept', '--git-proof', '--tag', '--review'],
+  jev: [],
+  claim: ['--id', '--run', '--wake'],
+  heartbeat: ['--owner', '--run', '--wake'],
+  'lead-wake': ['--task', '--tag', '--by', '--clear'],
+  done: ['--owner', '--by', '--force', '--evidence'],
+  evidence: ['--supporting'],
+  'verify-git': ['--by'],
+  judgment: [],
+  'check-start': [],
+  'check-end': [],
+  'check-abandon': [],
+  review: ['--by'],
+  'review-report': [],
+  accept: ['--reason', '--by'],
+  show: [],
+  decide: ['--summary', '--ref', '--by'],
+  'ask-owner': ['--by', '--packet'],
+  answer: ['--by', '--expected'],
+  note: ['--by', '--expected'],
+  'note-read': ['--by'],
+  'lead-reply': ['--by'],
+  'answer-read': ['--by'],
+  deliver: ['--task', '--limit'],
+  'deliver-retry': ['--by'],
+  inbox: [],
+  release: ['--by', '--reason'],
+  cancel: ['--by', '--reason'],
+  route: ['--reason', '--by'],
+  after: [],
+  list: ['--all', '--status', '--role', '--tag'],
+  view: ['--role', '--tag', '--owner', '--closed-limit', '--closed-before'],
+  moves: ['--by'],
+  archive: ['--id', '--older-than-days'],
+  stale: ['--hours', '--runs'],
+  reap: ['--older-than', '--role', '--include-untimed'],
+  doctor: ['--fix', '--runs'],
+}
+
+// "--by" and "--older-than-days" are flag-shaped; "--", "--By" and "use --force?" are not.
+const FLAG_SHAPE = /^--[a-z][a-z-]*$/
+
+function usageFor(command) {
+  const names = new RegExp(`^(?:.*\\| )?${command}(?: |$)`)
+  const lines = USAGE.split('\n').filter((line) => /^  \S/.test(line) && names.test(line.trim())).map((line) => line.trim())
+  return lines.length ? `usage: ${lines.join('\n       ')}` : 'run team-tasks.mjs with no command for the usage'
+}
+
+function refuseUnknownFlags(command, args) {
+  const unknown = args.find((arg) => FLAG_SHAPE.test(arg) && !FLAGS[command].includes(arg))
+  if (unknown) throw new Error(`${command} takes no ${unknown}. ${usageFor(command)}`)
+}
+
 const out = (value) => console.log(JSON.stringify(value, null, 2))
 const requireId = (args) => toInt(args[0], 'task id')
 
@@ -664,6 +720,7 @@ async function run(file, [command, ...args]) {
     process.exitCode = 1
     return
   }
+  refuseUnknownFlags(command, args)
   await handler(file, args)
 }
 
