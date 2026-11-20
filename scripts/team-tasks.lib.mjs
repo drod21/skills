@@ -21,17 +21,24 @@ import {
   truncateSync,
   writeFileSync,
 } from 'node:fs'
-import { createHash, randomBytes } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { type } from 'arktype'
-import { assertEvidenceScope, normalizeEvidenceScope } from './evidence-scope.mjs'
+import {
+  assertEvidenceScope,
+  evidenceContentId,
+  normalizeEvidenceScope,
+  readEvidenceFile,
+  retainedEvidenceContentId,
+  retainedEvidenceIntact,
+} from './evidence-scope.mjs'
 import { normalizeGitProof, verifyGitProof } from './board-git-proof.mjs'
 
 import { enqueueDeliveries, settleClaimOnlyDeliveries } from './team-board-delivery.mjs'
 import { matchStoredExecutor } from './jev-executors.catalog.mjs'
 import { JEV_CHECKS, JEV_HOLDS, JEV_ROUTES, KNOWN_ROUTES, ROLES, unknownRoleMessage } from './team-catalog.mjs'
-import { cleanText } from './text-guard.mjs'
+import { cleanText, secretFileReason } from './text-guard.mjs'
 import { reviewRevision, reviewMediaType } from './review-queue.mjs'
 
 export { JEV_CHECKS, JEV_HOLDS, JEV_ROUTES, KNOWN_ROUTES }
@@ -485,29 +492,33 @@ export function isVolatilePath(item) {
   return tempRoots().some((root) => pathUnder(item, root))
 }
 
-function tempFileAction(item) {
+// A gated task snapshots every local file it is given, so its verdict stays bound to the attached bytes. An
+// ungated task copies only temp files. A credentials filename is never read or copied.
+function artifactAction(item, snapshotLocalFiles) {
+  if (secretFileReason(basename(item))) return { kind: 'keep' }
   let stat
   try {
     stat = lstatSync(item)
   } catch {
     return { kind: 'keep' }
   }
-  if (stat.isSymbolicLink() || !stat.isFile()) return { kind: 'keep' }
+  if (stat.isSymbolicLink()) return snapshotLocalFiles ? { kind: 'symlink' } : { kind: 'keep' }
+  if (!stat.isFile()) return { kind: 'keep' }
   let real
   try {
     real = realpathSync(item)
   } catch {
     return { kind: 'keep' }
   }
-  if (!tempRoots().some((root) => pathUnder(real, root))) return { kind: 'keep' }
+  if (secretFileReason(basename(real))) return { kind: 'keep' }
+  if (!snapshotLocalFiles && !tempRoots().some((root) => pathUnder(real, root))) return { kind: 'keep' }
   if (stat.size > MAX_ARTIFACT_BYTES) return { kind: 'oversize' }
   return { kind: 'copy', real }
 }
 
 // `<id>/<sha12>/<name>`: the copy keeps its original basename, so name checks (jev-ask refuses `.env`) still apply.
 function artifactDir(boardFile, taskId, bytes) {
-  const sha = createHash('sha256').update(bytes).digest('hex').slice(0, 12)
-  return join(dirname(boardFile), 'tasks.json.artifacts', String(taskId), sha)
+  return join(dirname(boardFile), 'tasks.json.artifacts', String(taskId), evidenceContentId(bytes))
 }
 
 function artifactName(item) {
@@ -515,15 +526,30 @@ function artifactName(item) {
   return base && base !== '.' && base !== '..' ? base : 'file'
 }
 
+function retainedBytesMatch(path, bytes) {
+  try {
+    const stat = lstatSync(path)
+    return stat.isFile() && stat.size === bytes.length && readFileSync(path).equals(bytes)
+  } catch (error) {
+    if (error?.code === 'ENOENT') return false
+    throw error
+  }
+}
+
 function copyArtifact(boardFile, taskId, item, real) {
-  const bytes = readFileSync(real)
+  let bytes
+  try {
+    bytes = readEvidenceFile(real)
+  } catch {
+    throw new Error(`local evidence cannot be retained: ${basename(item)} (not a regular file of at most 25 MB)`)
+  }
   const dir = artifactDir(boardFile, taskId, bytes)
   const dest = join(dir, artifactName(item))
-  if (existsSync(dest)) return dest
+  if (retainedBytesMatch(dest, bytes)) return dest
   mkdirSync(dir, { recursive: true })
   const tmp = join(dir, `.${process.pid}.${randomBytes(4).toString('hex')}.tmp`)
   try {
-    writeFileSync(tmp, bytes)
+    writeFileSync(tmp, bytes, { mode: 0o400 })
     renameSync(tmp, dest)
   } catch (error) {
     rmSync(tmp, { force: true })
@@ -532,8 +558,10 @@ function copyArtifact(boardFile, taskId, item, real) {
   return dest
 }
 
-function storeOne(boardFile, taskId, item, notes) {
-  const action = tempFileAction(item)
+function storeOne(boardFile, taskId, item, notes, snapshotLocalFiles) {
+  const action = artifactAction(item, snapshotLocalFiles)
+  if (snapshotLocalFiles && (action.kind === 'symlink' || action.kind === 'oversize'))
+    throw new Error(`local evidence cannot be retained: ${basename(item)} (${action.kind})`)
   if (action.kind === 'oversize') {
     notes.push(`evidence file is over 25 MB; stored the original path: ${item}`)
     return item
@@ -543,18 +571,53 @@ function storeOne(boardFile, taskId, item, notes) {
 }
 
 /**
- * Copies a temp file beside the board before the caller takes the lock.
+ * Copies temp files, and every local file for a gated task, beside the board before the caller takes the lock.
  * A missing id or a stub throws first, so a typo creates no directory. `rehearse` runs the caller's mutation on
  * a copy of the unlocked board with the original paths; a mutation the board would refuse copies nothing.
  * The locked write checks again.
  */
 export function retainEvidence(boardFile, taskId, items, rehearse = null) {
   const board = readBoard(boardFile)
-  findLiveTask(board, taskId)
+  const task = findLiveTask(board, taskId)
   if (rehearse) rehearse(structuredClone(board))
   const notes = []
-  const stored = items.map((item) => storeOne(boardFile, taskId, item, notes))
+  const stored = items.map((item) => storeOne(boardFile, taskId, item, notes, Boolean(task.accept)))
   return { stored, notes }
+}
+
+// A check, an accept or a done on a gated task needs every retained copy to still hold its bytes, and every
+// existing local file to be retained: a legacy path could have changed since it was judged.
+function assertRetainedEvidence(task) {
+  for (const path of evidenceItems(task)) {
+    if (retainedEvidenceContentId(path) !== null) {
+      if (!retainedEvidenceIntact(path))
+        throw new Error(
+          `task ${task.id} retained evidence checksum could not be verified: ${basename(path)}; reattach the original file`,
+        )
+    } else if (isExistingFileEvidence(path)) {
+      throw new Error(`task ${task.id} local evidence must be retained: ${basename(path)}; reattach the original file`)
+    }
+  }
+}
+
+function isExistingFileEvidence(path) {
+  if (secretFileReason(basename(path))) return false
+  try {
+    const stat = lstatSync(path)
+    return stat.isFile() || stat.isSymbolicLink()
+  } catch {
+    return false
+  }
+}
+
+function legacyEvidenceMatches(path, contentId) {
+  try {
+    const real = realpathSync(path)
+    if (secretFileReason(basename(real))) return false
+    return evidenceContentId(readEvidenceFile(real)) === contentId
+  } catch {
+    return false
+  }
 }
 
 /** Full task. A stub is merged with its archive line; stub fields win. */
@@ -1352,11 +1415,7 @@ export function addJudgment(board, id, raw, { now = new Date() } = {}) {
   refuseStaleCheck(task, judgment)
   if (judgment.tool === 'check' && task.gitProof && !judgment.scope)
     throw new Error(`task ${task.id} needs a scoped check for the pinned candidate`)
-  if (judgment.scope) {
-    if (!sameEvidence(judgment.evidence, task.evidence))
-      throw new Error(`task ${task.id} evidence changed while the check ran; run the check again`)
-    assertEvidenceScope(task, judgment.scope)
-  }
+  assertEvidenceScope(task, judgment.scope)
   appendDecision(task, judgment)
   return task
 }
@@ -1376,10 +1435,11 @@ export function startEvidenceCheck(board, id, { by, token, evidence, basis, scop
   )
     throw new Error(`task ${id} changed while preparing the check; run the check again`)
   if (task.pendingChecks?.length) throw new Error(`task ${id} already has an evidence check in flight`)
+  assertRetainedEvidence(task)
   const checked = scope === undefined ? undefined : normalizeEvidenceScope(scope)
   assertEvidenceScope(task, checked)
   task.pendingChecks ??= []
-  task.pendingChecks.push({ token, by, ...(checked && { scope: checked, evidence }) })
+  task.pendingChecks.push({ token, by, evidence: [...evidence], ...(checked && { scope: checked }) })
   return task
 }
 
@@ -1395,8 +1455,8 @@ export function abandonStaleEvidenceCheck(board, id, { token, by, basis }) {
   if (task.status !== 'claimed' || task.owner !== by || decisionEntries(task).slice(basis).some(isInvalidator))
     return endEvidenceCheck(board, id, token)
   const check = task.pendingChecks?.find((entry) => entry.token === token)
+  if (check?.evidence && !sameEvidence(check.evidence, task.evidence)) return endEvidenceCheck(board, id, token)
   if (check?.scope) {
-    if (!sameEvidence(check.evidence, task.evidence)) return endEvidenceCheck(board, id, token)
     try {
       assertEvidenceScope(task, check.scope)
     } catch {
@@ -1410,6 +1470,8 @@ export function abandonStaleEvidenceCheck(board, id, { token, by, basis }) {
 // that read voids what the check judged, so its late answer is refused instead of counting as fresh.
 function refuseStaleCheck(task, judgment) {
   if (judgment.tool !== 'check') return
+  if (!sameEvidence(judgment.evidence, task.evidence))
+    throw new Error(`task ${task.id} evidence changed while the check ran; run the check again`)
   const decisions = decisionEntries(task)
   if (judgment.basis > decisions.length)
     throw new Error(`task ${task.id} has fewer journal entries than the check read; run the check again`)
@@ -1453,6 +1515,10 @@ export function acceptEvidence(board, id, { reason, by, now = new Date() } = {})
   // The lead accepts what Jev was unsure about, not evidence added after that check.
   if (!sameEvidence(check.evidence, task.evidence))
     throw new Error(`task ${task.id} evidence changed since the last check; run the check again`)
+  const decisions = decisionEntries(task)
+  if (decisions.slice(decisions.lastIndexOf(check) + 1).some(invalidatesHeldCheck))
+    throw new Error(`task ${task.id} decisions changed since the last check; run the check again`)
+  assertRetainedEvidence(task)
   assertEvidenceScope(task, check.scope)
   const decision = { kind: 'accept', at: now.toISOString(), by: cleanedBy, reason: trimmed, evidence, ...(check.scope && { scope: check.scope }) }
   appendDecision(task, decision)
@@ -1484,6 +1550,12 @@ function isInvalidator(entry) {
   if (entry.kind === 'note' && entry.reopened) return true
   const answered = entry.kind === 'judgment' && entry.outcome === 'answered'
   return answered && (entry.tool === 'ask' || entry.tool === 'decide')
+}
+
+// A release hands the task back but leaves a held check for the lead to resolve; any other invalidator changed
+// what the check judged.
+function invalidatesHeldCheck(entry) {
+  return entry?.kind !== 'release' && isInvalidator(entry)
 }
 
 function confirmsEvidence(entry, evidence) {
@@ -1522,9 +1594,10 @@ function hasOpenHold(task) {
 /**
  * What holds an open or claimed task for the owner, or null. A question to the owner comes first; then an ask or
  * decide hold with no later choice. Otherwise, unless a fresh confirmation covers the current evidence, the latest
- * check decides when it judged that evidence: a hold waits for the lead's accept, a rejection for new evidence or
- * a release. `entry` is the journal entry behind it. scripts/board-projection.mjs keeps a copy of these rules,
- * and scripts/team-board-gate.test.ts and scripts/team-board-view.test.ts hold it to this one.
+ * check decides when it judged that evidence: a hold waits for the lead's accept until a decision other than a
+ * release changes what it judged, a rejection for new evidence or a release. `entry` is the journal entry behind
+ * it. scripts/board-projection.mjs keeps a copy of these rules, and scripts/team-board-gate.test.ts and
+ * scripts/team-board-view.test.ts hold it to this one.
  */
 export function ownerGate(task) {
   if (task.status !== 'open' && task.status !== 'claimed') return null
@@ -1540,8 +1613,8 @@ export function ownerGate(task) {
   if (hasFreshConfirmation(task)) return null
   const check = latestCheck(task)
   if (!check || !sameEvidence(check.evidence, task.evidence)) return null
-  if (check.outcome === 'hold') return { why: 'hold', tool: 'check', entry: check }
   const later = decisions.slice(decisions.lastIndexOf(check) + 1)
+  if (check.outcome === 'hold' && !later.some(invalidatesHeldCheck)) return { why: 'hold', tool: 'check', entry: check }
   if (check.outcome === 'rejected' && !later.some((entry) => entry?.kind === 'release'))
     return { why: 'rejected', tool: 'check', entry: check }
   return null
@@ -1650,6 +1723,22 @@ function trimmedEvidenceItem(item) {
   return trimmed
 }
 
+// A gated task swaps a same-named legacy path for its retained copy when the bytes match.
+function replaceLegacyEvidence(existing, items) {
+  const next = [...existing]
+  for (const raw of items) {
+    const item = trimmedEvidenceItem(raw)
+    if (!retainedEvidenceIntact(item)) continue
+    const contentId = retainedEvidenceContentId(item)
+    for (let i = 0; i < next.length; i++) {
+      const old = next[i]
+      if (retainedEvidenceContentId(old) !== null || basename(old) !== basename(item)) continue
+      if (legacyEvidenceMatches(old, contentId)) next[i] = item
+    }
+  }
+  return next
+}
+
 function appendEvidence(task, items, field = 'evidence') {
   if (task.status === 'cancelled')
     throw new Error(`task ${task.id} is cancelled; a cancelled task cannot take evidence`)
@@ -1658,9 +1747,10 @@ function appendEvidence(task, items, field = 'evidence') {
     throw new Error(`task ${task.id} has evidence that is not a list`)
   if (Array.isArray(task[field]) && task[field].some((item) => typeof item !== 'string'))
     throw new Error(`task ${task.id} has evidence that is not all strings`)
-  const existing = Array.isArray(task[field]) ? task[field] : []
+  const current = Array.isArray(task[field]) ? task[field] : []
+  const existing = task.accept ? replaceLegacyEvidence(current, items) : current
   const seen = new Set(existing)
-  const next = [...existing]
+  const next = [...seen]
   for (const item of items) {
     const trimmed = trimmedEvidenceItem(item)
     if (seen.has(trimmed)) continue
@@ -1710,6 +1800,7 @@ export function doneTask(board, id, { owner = null, by = null, force = false, no
   if (evidence.length) appendEvidence(task, evidence)
   if (task.status === 'done') return task
   assertDoneAble(task)
+  if (task.accept) assertRetainedEvidence(task)
   recordDoneStop(board, task, by, now)
   task.status = 'done'
   task.doneAt = now.toISOString()
