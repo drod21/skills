@@ -161,8 +161,9 @@ paths and a run link live on the task, including after `done`. The board has no
 execution engine; a heartbeat only says you are alive. `list` shows open and
 claimed tasks (`list --all` is history), `show <id>` prints one task, and `stale`
 and `doctor` are read-only, so use them when only inspection is authorized. A file
-under the temp directory is copied beside the board; other paths, URLs and notes
-are stored as given. `jev-route.ts --calibrate` reads outcomes before a routing
+under the temp directory is copied beside the board, and on a task with `accept`
+every local file is, so the check judges the bytes you attached; other paths, URLs
+and notes are stored as given. `jev-route.ts --calibrate` reads outcomes before a routing
 threshold changes. A lock acquisition error is a coordination failure to report,
 not a reason to spin or reset state.
 

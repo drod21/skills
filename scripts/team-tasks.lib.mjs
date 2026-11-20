@@ -1750,7 +1750,7 @@ function appendEvidence(task, items, field = 'evidence') {
   const current = Array.isArray(task[field]) ? task[field] : []
   const existing = task.accept ? replaceLegacyEvidence(current, items) : current
   const seen = new Set(existing)
-  const next = [...seen]
+  const next = task.accept ? [...seen] : [...existing]
   for (const item of items) {
     const trimmed = trimmedEvidenceItem(item)
     if (seen.has(trimmed)) continue
