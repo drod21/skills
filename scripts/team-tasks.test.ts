@@ -181,7 +181,9 @@ function cli(...args: string[]) {
     status: result.status,
     stdout: result.stdout,
     stderr: result.stderr,
-    json: result.stdout.trim() ? JSON.parse(result.stdout) : undefined,
+    get json() {
+      return result.stdout.trim() ? JSON.parse(result.stdout) : undefined
+    },
   }
 }
 
@@ -302,12 +304,69 @@ describe('read-only commands never write', () => {
     seed(task(1), task(2, { role: 'qa-worker', status: 'done' }))
     const before = readFileSync(board, 'utf8')
     const entries = readdirSync(dir)
-    expect(cli('list').json.map((t: Task) => t.id)).toEqual([1])
-    expect(cli('list', '--all').json).toHaveLength(2)
-    expect(cli('list', '--status', 'done').json.map((t: Task) => t.id)).toEqual([2])
-    expect(cli('list', '--role', 'ux-worker').json.map((t: Task) => t.id)).toEqual([1])
+    expect(cli('list', '--json').json.map((t: Task) => t.id)).toEqual([1])
+    expect(cli('list', '--all', '--json').json).toHaveLength(2)
+    expect(cli('list', '--status', 'done', '--json').json.map((t: Task) => t.id)).toEqual([2])
+    expect(cli('list', '--role', 'ux-worker', '--json').json.map((t: Task) => t.id)).toEqual([1])
     expect(readFileSync(board, 'utf8')).toBe(before)
     expect(readdirSync(dir)).toEqual(entries)
+  })
+})
+
+describe('compact reads', () => {
+  const verdict = {
+    route: 'sonnet_patch',
+    jevRoute: 'sonnet_patch',
+    confidence: 0.9,
+    holds: [],
+    roleFits: true,
+    suggestedRole: null,
+    check: null,
+    reasons: ['small'],
+    answers: { scope: { score: 0.2 } },
+  }
+
+  it('list prints one line per task with its id, status, role, owner, route, dependencies and title', () => {
+    seed(
+      task(1, { title: 'Fix the login copy', jev: verdict }),
+      task(2, { status: 'claimed', owner: 'w2', after: [1], tag: 'auth', title: 'Wire magic links' }),
+      task(3, { status: 'done', title: 'Old work' }),
+    )
+    const result = cli('list')
+    expect(result.status).toBe(0)
+    expect(result.stdout.trimEnd().split('\n')).toEqual([
+      '#1 open ux-worker - sonnet_patch Fix the login copy',
+      '#2 claimed ux-worker w2 sonnet_patch after=1 tag=auth Wire magic links',
+    ])
+  })
+
+  it('list --json prints the full tasks', () => {
+    seed(task(1, { jev: verdict }))
+    expect(cli('list', '--json', '--json').json).toEqual([task(1, { jev: verdict })])
+  })
+
+  it('show leaves out raw Jev answers unless --full', () => {
+    seed(task(1, { jev: verdict }))
+    const { answers, ...rest } = verdict
+    expect(cli('show', '1').json.jev).toEqual({ ...rest, answersOmitted: 'show 1 --full' })
+    expect(cli('show', '1', '--full').json.jev).toEqual(verdict)
+  })
+
+  it('an unknown or missing command prints the command names, and help <command> prints that command only', () => {
+    seed(task(1))
+    for (const args of [['bogus'], []]) {
+      const result = cli(...args)
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain('help <command>')
+      expect(result.stderr).toContain('evidence')
+      expect(result.stderr.length).toBeLessThan(1200)
+    }
+    const evidence = cli('help', 'evidence')
+    expect(evidence.status).toBe(0)
+    expect(evidence.stdout).toContain('evidence <id> [--supporting] <item...>')
+    expect(evidence.stdout).not.toContain('decide <id>')
+    expect(cli('help').stdout).toContain('Decision policy')
+    expect(cli('help', 'bogus').status).toBe(1)
   })
 })
 
@@ -1774,8 +1833,8 @@ describe('accept, tag, and catalog roles', () => {
     cli('add', 'lead', 'Untagged split')
     expect(cli('add', 'ux-worker', 'Bad', '--tag', 'Wizard', '--accept', 'no').status).toBe(1)
     expect(cli('add', 'ux-worker', 'Bad', '--tag', '-nope', '--accept', 'no').stderr).toContain('--tag')
-    expect(cli('list', '--tag', 'wizard-1276').json.map((item: Task) => item.title)).toEqual(['Wizard'])
-    expect(cli('list').json).toHaveLength(3)
+    expect(cli('list', '--tag', 'wizard-1276', '--json').json.map((item: Task) => item.title)).toEqual(['Wizard'])
+    expect(cli('list', '--json').json).toHaveLength(3)
   })
 })
 
@@ -2123,9 +2182,9 @@ describe('archive', () => {
       archived: true,
       evidence: ['a.png'],
     })
-    expect(cli('list').json.map((item: Task) => item.id)).toEqual([2, 5])
-    expect(cli('list', '--all').json.find((item: Task) => item.id === 1)).toMatchObject({ title: bulky })
-    expect(cli('list', '--status', 'done').json.map((item: Task) => item.id)).toEqual([1, 4])
+    expect(cli('list', '--json').json.map((item: Task) => item.id)).toEqual([2, 5])
+    expect(cli('list', '--all', '--json').json.find((item: Task) => item.id === 1)).toMatchObject({ title: bulky })
+    expect(cli('list', '--status', 'done', '--json').json.map((item: Task) => item.id)).toEqual([1, 4])
   })
 
   it('claim and add still work after an archive', () => {

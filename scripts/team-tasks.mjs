@@ -116,7 +116,8 @@ const USAGE = [
   '                                          lead accepts evidence when the latest check is a hold and',
   '                                          no decision but a release followed it.',
   '                                          --by must differ from the task owner',
-  '  show <id>                               print one task, merging the archive for a stub',
+  '  show <id> [--full]                      print one task, merging the archive for a stub.',
+  '                                          Raw Jev answers only with --full',
   '  decide <id> --summary <text> [--ref <path>] [--by <owner>]',
   '                                          --ref and --by are trimmed; a blank value is refused.',
   '                                          A temp --ref file, or any local one on a gated task, is',
@@ -142,7 +143,9 @@ const USAGE = [
   '                                          --reason is required to leave needs_lead, to override the',
   '                                          verdict, or to change a route a lead decision is holding,',
   '                                          including a return to the verdict route. --by jev is reserved',
-  '  list [--all] [--status <s>] [--role <r>] [--tag <t>]',
+  '  list [--all] [--status <s>] [--role <r>] [--tag <t>] [--json]',
+  '                                          one line per task: id status role owner route after tag title.',
+  '                                          --json prints the full tasks',
   '                                          default is open and claimed. --all expands the archive.',
   '                                          --status uses the full set, then filters. --tag filters too',
   '  archive --older-than-days <n>           append old done and cancelled tasks to',
@@ -239,7 +242,7 @@ const FLAGS = {
   review: ['--by'],
   'review-report': [],
   accept: ['--reason', '--by'],
-  show: [],
+  show: ['--full'],
   decide: ['--summary', '--ref', '--by'],
   'ask-owner': ['--by', '--packet'],
   answer: ['--by', '--expected'],
@@ -254,7 +257,8 @@ const FLAGS = {
   cancel: ['--by', '--reason'],
   route: ['--reason', '--by'],
   after: [],
-  list: ['--all', '--status', '--role', '--tag'],
+  list: ['--all', '--status', '--role', '--tag', '--json'],
+  help: [],
   view: ['--role', '--tag', '--owner', '--closed-limit', '--closed-before'],
   moves: ['--by'],
   archive: ['--id', '--older-than-days'],
@@ -269,7 +273,7 @@ const FLAG_SHAPE = /^--[a-z][a-z-]*$/
 function usageFor(command) {
   const names = new RegExp(`^(?:.*\\| )?${command}(?: |$)`)
   const lines = USAGE.split('\n').filter((line) => /^  \S/.test(line) && names.test(line.trim())).map((line) => line.trim())
-  return lines.length ? `usage: ${lines.join('\n       ')}` : 'run team-tasks.mjs with no command for the usage'
+  return lines.length ? `usage: ${lines.join('\n       ')}` : 'run team-tasks.mjs help for the full usage'
 }
 
 function refuseUnknownFlags(command, args) {
@@ -552,7 +556,12 @@ const COMMANDS = {
     out(withBoard(file, (board) => acceptEvidence(board, requireId(args), { reason, by })))
   },
   show(file, args) {
-    out(showTask(file, requireId(args)))
+    const full = takeSwitch(args, '--full')
+    const id = requireId(args)
+    const task = showTask(file, id)
+    if (full || !task.jev?.answers) return out(task)
+    const { answers, ...jev } = task.jev
+    out({ ...task, jev: { ...jev, answersOmitted: `show ${id} --full` } })
   },
   decide(file, args) {
     const summary = takeFlag(args, '--summary')
@@ -628,7 +637,16 @@ const COMMANDS = {
     const status = takeFlag(args, '--status')
     const role = takeFlag(args, '--role')
     const tag = takeFlag(args, '--tag')
-    out(listBoard(file, { all, status, role, tag }))
+    const json = takeSwitch(args, '--json')
+    const tasks = listBoard(file, { all, status, role, tag })
+    if (json) return out(tasks)
+    if (tasks.length) console.log(tasks.map(taskLine).join('\n'))
+  },
+  help(file, args) {
+    if (args.length > 1) throw new Error('usage: help [<command>]')
+    if (!args.length) return console.log(USAGE)
+    if (!Object.hasOwn(COMMANDS, args[0])) throw new Error(`unknown command ${args[0]}. ${COMMAND_NAMES}`)
+    console.log(usageFor(args[0]))
   },
   async view(file, args) {
     const role = takeFlag(args, '--role')
@@ -717,10 +735,19 @@ const COMMANDS = {
   },
 }
 
+const COMMAND_NAMES = `commands: ${Object.keys(COMMANDS).join(', ')}
+run team-tasks.mjs help <command> for one command's usage, or help for all of it`
+
+function taskLine(task) {
+  const after = task.after?.length ? ` after=${task.after.join(',')}` : ''
+  const tag = task.tag ? ` tag=${task.tag}` : ''
+  return `#${task.id} ${task.status} ${task.role} ${task.owner ?? '-'} ${task.route ?? '-'}${after}${tag} ${task.title}`
+}
+
 async function run(file, [command, ...args]) {
   const handler = Object.hasOwn(COMMANDS, command ?? '') ? COMMANDS[command] : null
   if (!handler) {
-    console.error(USAGE)
+    console.error(`${command ? `unknown command ${command}. ` : ''}${COMMAND_NAMES}`)
     process.exitCode = 1
     return
   }

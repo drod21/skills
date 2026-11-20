@@ -250,7 +250,7 @@ function defaultBoardExec(script: string, argv: string[]) {
 const BOARD_LIST_MAX_BUFFER = 256 * 1024 * 1024
 
 function readBoardTasks(boardScript: string): BoardTask[] {
-  const stdout = execFileSync(process.execPath, [boardScript, 'list', '--all'], {
+  const stdout = execFileSync(process.execPath, [boardScript, 'list', '--all', '--json'], {
     env: process.env,
     encoding: 'utf8',
     maxBuffer: BOARD_LIST_MAX_BUFFER,
