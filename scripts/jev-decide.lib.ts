@@ -2,9 +2,14 @@
 // Each Score sees only its own option. The Choice sees every option, plus an order-reversed copy
 // that measures position bias in the same call. A companion Noul checks "any reasonable first step"
 // because a none-of-the-above label often underperforms on its own.
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+
 import { choice, noul, score, type Question } from '@typesafe-ai/sdk'
+import { type } from 'arktype'
 
 import { cleanText } from './jev-guard.lib.ts'
+import { resolveBoardFile } from './team-board-path.mjs'
 
 // Composite weights over 0..1 normalized dimensions; they sum to 1.
 // Evidence leads: a first step that is not shown to work wastes a verification cycle.
@@ -48,7 +53,7 @@ type RubricText = {
 }
 
 // general fits any engineering decision. Every rubric has four levels per dimension so saved answers rescore under it.
-export const RUBRICS = {
+const BUILT_IN_RUBRICS = {
   general: {
     dimensions: {
       evidence: {
@@ -102,7 +107,50 @@ export const RUBRICS = {
     },
   },
 } as const satisfies Record<string, RubricText>
-export type RubricName = keyof typeof RUBRICS
+
+const text = 'string > 0'
+const dimensionText = type({ '+': 'reject', question: text, levels: [text, text, text, text] })
+const rubricText = type({
+  '+': 'reject',
+  dimensions: { '+': 'reject', evidence: dimensionText, risk: dimensionText, cost: dimensionText, value: dimensionText },
+  noGood: { '+': 'reject', title: text, description: text, evidence: text },
+  anySound: { '+': 'reject', true: text, false: text },
+})
+const projectRubrics = type({ '[string]': rubricText })
+const RUBRIC_NAME = /^[a-z][a-z0-9_]{0,47}$/
+
+/**
+ * Project rubrics from a JSON object `{ "rubric_name": { dimensions, noGood, anySound } }`. A missing file adds
+ * nothing; a file that exists but does not match the built-in rubric's shape throws, so a typo cannot reword a call.
+ */
+export function loadProjectRubrics(file: string | null | undefined): Record<string, RubricText> {
+  if (!file || !existsSync(file)) return {}
+  let raw: unknown
+  try {
+    raw = JSON.parse(readFileSync(file, 'utf8'))
+  } catch (err) {
+    throw new Error(`${file} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  const parsed = projectRubrics(raw)
+  if (parsed instanceof type.errors) throw new Error(`${file} must map rubric names to rubrics: ${parsed.summary}`)
+  const badName = Object.keys(parsed).find((name) => !RUBRIC_NAME.test(name))
+  if (badName !== undefined) throw new Error(`${file}: rubric ${JSON.stringify(badName)} must match ${RUBRIC_NAME}`)
+  return parsed
+}
+
+/** TEAM_RUBRICS_FILE, else team-rubrics.json beside the board. */
+export function rubricsFile(): string {
+  const override = process.env.TEAM_RUBRICS_FILE
+  if (override && override.trim()) return override.trim()
+  return join(dirname(resolveBoardFile()), 'team-rubrics.json')
+}
+
+// A project rubric never replaces a built-in one.
+export const RUBRICS: typeof BUILT_IN_RUBRICS & Record<string, RubricText> = {
+  ...loadProjectRubrics(rubricsFile()),
+  ...BUILT_IN_RUBRICS,
+}
+export type RubricName = string
 export const DEFAULT_RUBRIC: RubricName = 'general'
 
 const DIMENSION_NAMES = Object.keys(DIMENSION_POLICY) as Dimension[]

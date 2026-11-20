@@ -4,7 +4,8 @@ import { resolveBoardFile } from './team-board-path.mjs'
 // Usage: node scripts/jev-decide.ts <input.json> [--dry-run] [--out <result.json>] [--model jev-latest] [--force] [--task <id> --by <owner>]
 //        node scripts/jev-decide.ts --rescore <result.json> [--out <rescored.json>] [--force]
 // Input:  { decision, context, rubric?, options: [{ id, title, description, evidence }] }
-// rubric is general (the default and only rubric). Default output is <input-basename>.result.json beside the input.
+// rubric is general (the default) or a project rubric from team-rubrics.json beside the board (or TEAM_RUBRICS_FILE).
+// Default output is <input-basename>.result.json beside the input.
 // --dry-run prints the exact request body and exits without calling the API.
 // --rescore applies today's weights and holds to a saved result's raw answers, with no API call.
 // Needs TYPESAFE_API_KEY (read by the SDK, never printed).

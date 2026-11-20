@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -974,5 +975,87 @@ describe('CLI', () => {
     } finally {
       log.mockRestore()
     }
+  })
+})
+
+describe('project rubrics', () => {
+  const dirs: string[] = []
+  afterEach(() => {
+    dirs.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true }))
+  })
+
+  const dimension = (name: string) => ({
+    question: `Project ${name} question about \`option.description\``,
+    levels: [`${name} level 0`, `${name} level 1`, `${name} level 2`, `${name} level 3`],
+  })
+  const projectRubric = {
+    dimensions: { evidence: dimension('evidence'), risk: dimension('risk'), cost: dimension('cost'), value: dimension('value') },
+    noGood: { title: 'No project option', description: 'None of the project options fits', evidence: 'Not an option to carry out' },
+    anySound: { true: 'A project option fits', false: 'No project option fits' },
+  }
+
+  function project(rubrics: unknown) {
+    const dir = mkdtempSync(join(tmpdir(), 'jev-decide-rubrics-'))
+    dirs.push(dir)
+    writeFileSync(join(dir, 'team-rubrics.json'), JSON.stringify(rubrics))
+    const env = { ...process.env, TEAM_TASKS_FILE: join(dir, 'tasks.json') } as Record<string, string | undefined>
+    delete env.TEAM_RUBRICS_FILE
+    delete env.TYPESAFE_API_KEY
+    const run = (...args: string[]) =>
+      spawnSync(process.execPath, [join(import.meta.dirname, 'jev-decide.ts'), ...args], { encoding: 'utf8', env })
+    const input = (body: unknown, name = 'choice.json') => {
+      const file = join(dir, name)
+      writeFileSync(file, JSON.stringify(body))
+      return file
+    }
+    return { dir, env, run, input }
+  }
+
+  it('asks with a rubric from team-rubrics.json beside the board, and a project file never replaces general', () => {
+    const { run, input } = project({ project_review: projectRubric, general: projectRubric })
+    const custom = run(input({ ...sample(), rubric: 'project_review' }), '--dry-run')
+    expect(custom.status, custom.stderr).toBe(0)
+    const request = JSON.parse(custom.stdout)
+    expect(request.questions.evidence__alpha.criteria).toEqual(projectRubric.dimensions.evidence.levels)
+    expect(request.questions.first_step.criteria[NO_GOOD]).toEqual(projectRubric.noGood)
+    const general = run(input(sample(), 'general.json'), '--dry-run')
+    expect(general.status, general.stderr).toBe(0)
+    expect(JSON.parse(general.stdout).questions.evidence__alpha.criteria).toEqual([
+      ...RUBRICS.general.dimensions.evidence.levels,
+    ])
+  })
+
+  it('rescores a result saved under a project rubric', () => {
+    const { dir, run } = project({ project_review: projectRubric })
+    const input = sample()
+    const saved = join(dir, 'choice.result.json')
+    writeFileSync(
+      saved,
+      JSON.stringify({
+        rubric: 'project_review',
+        request: buildRequest(input),
+        rawAnswers: answersFor(input, {
+          alpha: { evidence: { score: 3 }, risk: { score: 0 }, cost: { score: 0 }, value: { score: 3 } },
+          beta: { evidence: { score: 0 }, risk: { score: 3 }, cost: { score: 3 }, value: { score: 0 } },
+        }),
+      }),
+    )
+    const rescored = run('--rescore', saved)
+    expect(rescored.status, rescored.stderr).toBe(0)
+    expect(rescored.stdout).toContain('Recommendation: alpha')
+  })
+
+  it('refuses a rubrics file that is not four dimensions of four levels, naming TEAM_RUBRICS_FILE', () => {
+    const { dir, env, input } = project({})
+    const bad = join(dir, 'rubrics.json')
+    const short = { ...projectRubric.dimensions.cost, levels: projectRubric.dimensions.cost.levels.slice(0, 3) }
+    writeFileSync(bad, JSON.stringify({ project_review: { ...projectRubric, dimensions: { ...projectRubric.dimensions, cost: short } } }))
+    const result = spawnSync(process.execPath, [join(import.meta.dirname, 'jev-decide.ts'), input(sample()), '--dry-run'], {
+      encoding: 'utf8',
+      env: { ...env, TEAM_RUBRICS_FILE: bad },
+    })
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain(bad)
+    expect(result.stderr).toContain('cost')
   })
 })
