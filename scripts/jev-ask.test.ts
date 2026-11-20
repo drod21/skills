@@ -245,6 +245,20 @@ describe('jev-ask CLI', { timeout: 60_000 }, () => {
     }
   })
 
+  it('refuses a changed retained report in preflight', async () => {
+    const file = board()
+    const report = retain(file, 'report.txt', 'The original report.')
+    rmSync(report)
+    writeFileSync(report, 'The changed report.')
+    const output = capture()
+    try {
+      expect(await main([...checkArgs('acceptance', [report]), '--preflight'], { client: { systemOne: vi.fn() } })).toBe(1)
+      expect(String(output.log.mock.calls.at(-1)?.[0])).toMatch(/retained evidence.*checksum/i)
+    } finally {
+      output.restore()
+    }
+  })
+
   it('keeps a scoped verdict after a supporting attachment but blocks changed proof', async () => {
     const file = board()
     const proof = retain(file, 'proof.txt', 'The label is whole.')
