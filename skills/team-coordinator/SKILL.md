@@ -148,7 +148,9 @@ fixing tests after the build.
    test worker writes the tests and only the contract they need to compile
    (types, signatures, a module that throws "not implemented"), commits them as
    the unit branch's first commit, and returns the SHA, the locked test files,
-   the run command, and a red run showing each test fails for its stated reason
+   the run command, every older test it amended or removed because it asserts
+   the opposite of a numbered decision ("none" with the command it ran), and a
+   red run showing each test fails for its stated reason
    rather than on an import or setup error. A skipped test is not red, so the
    red run reports zero skips. Dispatch only after the owner decisions the cases
    depend on are answered.
@@ -159,8 +161,8 @@ fixing tests after the build.
    builder is released. Then record the baseline with `decide <test id> --summary
    <SHA and red result> --by <lead>`, release the builder with `after <build id>
    none`, then dispatch. Close the test task with the builder's green run. The
-   build brief names the test commit, the locked files and the run command, and
-   says: make these pass; do not edit, skip, delete, loosen or re-time a locked
+   build brief names the test commit, the locked files, the run command and the
+   line `Older tests changed: <list> | none (<command>)`, and says: make these pass; do not edit, skip, delete, loosen or re-time a locked
    file. A builder may add tests in new files. A builder who believes a locked
    test is wrong stops that part, reports the test, reason and evidence to the
    lead, and continues with the rest.
@@ -252,8 +254,10 @@ designated coordinator board regardless. For a pinned review, resolve the
 candidate SHA and verify that the assigned checkout's `HEAD` matches it exactly.
 
 Give each worker: task title and ID, role skill, absolute board script,
-checkout and head, allowed files, dependencies, acceptance checks and expected
-evidence. Every test and build brief says: branch from `origin/main` (a builder
+checkout and head, allowed files, dependencies, acceptance checks, expected
+evidence, and a **Guards** line copied from the project's instructions (how files
+may be written, the load guard, banned commands), so a project hook never refuses
+work the brief asked for. Every test and build brief says: branch from `origin/main` (a builder
 from its test commit on that branch); carry another packet's commits only when
 the plan names that dependency. Workers follow the [worker protocol](references/worker-protocol.md).
 A plain `claim <role> <owner>` returns the first eligible task for the role, which
