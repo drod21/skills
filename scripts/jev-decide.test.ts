@@ -1045,17 +1045,22 @@ describe('project rubrics', () => {
     expect(rescored.stdout).toContain('Recommendation: alpha')
   })
 
-  it('refuses a rubrics file that is not four dimensions of four levels, naming TEAM_RUBRICS_FILE', () => {
+  const short = { ...projectRubric.dimensions.cost, levels: projectRubric.dimensions.cost.levels.slice(0, 3) }
+  it.each([
+    { name: 'three levels', body: JSON.stringify({ project_review: { ...projectRubric, dimensions: { ...projectRubric.dimensions, cost: short } } }), says: 'cost' },
+    { name: 'an extra key', body: JSON.stringify({ project_review: { ...projectRubric, noGood: { ...projectRubric.noGood, hint: 'x' } } }), says: 'hint' },
+    { name: 'a bad name', body: JSON.stringify({ 'Project Review': projectRubric }), says: 'Project Review' },
+    { name: 'invalid JSON', body: '{', says: 'not valid JSON' },
+  ])('refuses a rubrics file with $name, naming TEAM_RUBRICS_FILE', ({ body, says }) => {
     const { dir, env, input } = project({})
     const bad = join(dir, 'rubrics.json')
-    const short = { ...projectRubric.dimensions.cost, levels: projectRubric.dimensions.cost.levels.slice(0, 3) }
-    writeFileSync(bad, JSON.stringify({ project_review: { ...projectRubric, dimensions: { ...projectRubric.dimensions, cost: short } } }))
+    writeFileSync(bad, body)
     const result = spawnSync(process.execPath, [join(import.meta.dirname, 'jev-decide.ts'), input(sample()), '--dry-run'], {
       encoding: 'utf8',
       env: { ...env, TEAM_RUBRICS_FILE: bad },
     })
     expect(result.status).toBe(1)
     expect(result.stderr).toContain(bad)
-    expect(result.stderr).toContain('cost')
+    expect(result.stderr).toContain(says)
   })
 })
