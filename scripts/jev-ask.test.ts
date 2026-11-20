@@ -228,6 +228,23 @@ describe('jev-ask CLI', { timeout: 60_000 }, () => {
     ]
   }
 
+  it('refuses a changed retained report before contacting the reviewer', async () => {
+    const file = board()
+    const report = retain(file, 'report.txt', 'The original report.')
+    rmSync(report)
+    writeFileSync(report, 'The changed report.')
+    const client = { systemOne: vi.fn(async () => ({ answers: { fits: { noul: 0.9 }, gap: gap('fits', 0.8) } })) }
+    const output = capture()
+    try {
+      expect(await main(checkArgs('acceptance', [report]), { client })).toBe(1)
+      expect(String(output.log.mock.calls.at(-1)?.[0])).toMatch(/retained evidence.*checksum/i)
+      expect(client.systemOne).not.toHaveBeenCalled()
+      expect(judgments(file)).toEqual([])
+    } finally {
+      output.restore()
+    }
+  })
+
   it('keeps a scoped verdict after a supporting attachment but blocks changed proof', async () => {
     const file = board()
     const proof = retain(file, 'proof.txt', 'The label is whole.')
@@ -245,6 +262,7 @@ describe('jev-ask CLI', { timeout: 60_000 }, () => {
       const first = done()
       expect(first.status, first.stderr).toBe(0)
       writeFileSync(file, snapshot)
+      rmSync(proof)
       writeFileSync(proof, 'The label is clipped.')
       expect(done().stderr).toContain('selected evidence changed')
     } finally {
@@ -592,10 +610,9 @@ describe('jev-ask CLI', { timeout: 60_000 }, () => {
       env: boardEnv,
       stdio: 'pipe',
     })
-    // Check privacy for the board's stored reference, whether copied or kept on this host.
+    // The board keeps the credential path without creating another copy.
     const storedEnv = JSON.parse(readFileSync(file, 'utf8')).tasks[0].evidence[0]
-    if (process.platform !== 'win32') expect(storedEnv).toMatch(/tasks\.json\.artifacts\/1\/[0-9a-f]{12}\/\.env$/)
-    expect(storedEnv.replaceAll('\\', '/')).toMatch(/\/\.env$/)
+    expect(storedEnv).toBe(env)
     expect(readFileSync(storedEnv, 'utf8')).toBe('DATABASE_HOST=envfile-marker')
     const sent: unknown[] = []
     const client = {

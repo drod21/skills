@@ -99,7 +99,9 @@ Upkeep: `archive --older-than-days <n>` or `archive --id <id>`, `doctor --fix`.
   a held route.
 - A later `decide`, answered ask, release, reap, new acceptance evidence, a note on a done
   task or a review update voids an earlier acceptance check; the next claim needs
-  a fresh one.
+  a fresh one. A held check stays with the lead through a release or reap; any other
+  of these drops it from the owner queue, and `accept` refuses until a fresh check.
+  A check whose evidence changed while it ran is refused and frees its slot.
 - `evidence <id> --supporting <path>` retains receipts or handoff material that
   carries no acceptance input. It cannot satisfy or invalidate the acceptance
   gate. For phased checks, `done` revalidates the selected file hashes.
@@ -107,9 +109,17 @@ Upkeep: `archive --older-than-days <n>` or `archive --id <id>`, `doctor --fix`.
   at `add ... --git-proof <plan.json>`. The claim owner runs
   `verify-git <id> --by <owner>`. A mixed task also needs a phased Jev check
   tied to that candidate. See the [proof plan fields](../team-coordinator/references/jev-team.md#mechanical-proof).
-- A temp-directory path passed to `evidence`, `done --evidence` or `decide --ref`
-  is copied beside the board (up to 25 MiB); other paths, URLs and notes are
-  stored as given.
+- A temp-directory file passed to `evidence`, `done --evidence` or `decide --ref`
+  is copied beside the board as `tasks.json.artifacts/<task-id>/<sha12>/<name>`,
+  read-only, up to 25 MiB. On a task with `accept` every local file is copied that
+  way, and a symlink or a file over 25 MiB is refused. A credentials filename
+  (`.env`, `.npmrc`, `*.pem`, ...) is never read or copied. URLs and notes are
+  stored as given. Reattaching the same bytes restores a damaged copy.
+- On a task with `accept`, `check-start`, `accept` and `done` re-hash every
+  retained copy against its `<sha12>` directory and refuse an existing local file
+  that was never retained. Reattach the original with `evidence`: a copy whose
+  bytes match what the old path holds replaces it; otherwise the evidence changed
+  and needs a fresh check.
 - The gate is a protocol gate, not tamper-proof: an agent that edits the board JSON
   gets past it. Never edit live board JSON or delete its lock to recover.
 

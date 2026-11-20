@@ -32,7 +32,9 @@ decision to the lead.
   claim"), not a timeout.
 - `done` does not call Jev. For a task with `accept`, `doneBlockers` enforces
   NeverDoneUnchecked, NeverDoneUnconfirmed and NeverDoneWhileHeld from the decision
-  journal; a task with no `accept` stays ungated.
+  journal; a task with no `accept` stays ungated. A check, an accept or a done on a
+  gated task also re-verifies each retained copy's checksum (see
+  [team-board](../../team-board/SKILL.md)).
 
 ## Current acceptance evidence
 
