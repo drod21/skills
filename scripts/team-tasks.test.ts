@@ -1398,11 +1398,30 @@ describe('verdict and evidence edges', () => {
     expect(byId(1).jev?.answers).toEqual(answers)
   })
 
+  it('names a flag the command does not take, with that command usage, and changes nothing', () => {
+    seed(task(1, { status: 'claimed', owner: 'w1' }))
+    const before = readFileSync(board, 'utf8')
+    const evidence = cli('evidence', '1', '--by', 'w1', 'docs/a.md')
+    expect(evidence.status).toBe(1)
+    expect(evidence.stderr).toContain('evidence takes no --by')
+    expect(evidence.stderr).toContain('usage: evidence <id> [--supporting] <item...>')
+    const decide = cli('decide', '1', '--summary', 'why', '--owner', 'w1')
+    expect(decide.stderr).toContain('decide takes no --owner')
+    expect(decide.stderr).toContain('usage: decide <id> --summary <text>')
+    expect(cli('note', '1', 'hello', '--owner', 'o', '--by', 'owner').stderr).toContain('note takes no --owner')
+    expect(readFileSync(board, 'utf8')).toBe(before)
+  })
+
+  it('keeps dashes inside free text', () => {
+    seed(task(1, { status: 'claimed', owner: 'w1' }))
+    expect(cli('ask-owner', '1', 'Ship', '--', 'or', 'wait?', '--by', 'w1').status).toBe(0)
+  })
+
   it('refuses bad evidence, allows it on done, and trims new items', () => {
     seed(task(1, { evidence: ['docs/a.md'] }))
     expect(cli('evidence', '1').status).toBe(1)
     expect(cli('evidence', '1', '   ').stderr).toContain('non-empty')
-    expect(cli('evidence', '1', '--owner').stderr).toContain('must not start with --')
+    expect(cli('evidence', '1', '--owner').stderr).toContain('evidence takes no --owner')
     expect(cli('evidence', '1', '  docs/b.md  ').status).toBe(0)
     expect(byId(1).evidence).toEqual(['docs/a.md', 'docs/b.md'])
 
@@ -2366,7 +2385,7 @@ describe('owner thread', () => {
     expect(cli('ask-owner', '1', 'x').stderr).toContain('usage: ask-owner')
     expect(cli('ask-owner', '1', 'x', '--by', 'jev').stderr).toContain('reserved')
     expect(cli('ask-owner', '1', '--by', 'w1').stderr).toContain('usage: ask-owner')
-    expect(cli('ask-owner', '1', '--x', '--by', 'w1').stderr).toContain('must not start with --')
+    expect(cli('ask-owner', '1', '--x', '--by', 'w1').stderr).toContain('ask-owner takes no --x')
     expect(cli('ask-owner', '2', 'x', '--by', 'w1').stderr).toContain('only a claimed task')
     expect(cli('note-read', '1', '--by', 'lead').stderr).toContain('note-read needs NoteQueued')
     expect(cli('lead-reply', '1', 'x', '--by', 'lead').stderr).toContain('no handed question and no note')
