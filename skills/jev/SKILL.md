@@ -31,7 +31,9 @@ contains it. Install dependencies once with `pnpm install` in the toolkit.
 
 Shared pieces: `jev-guard.lib.ts` (secret and size guards), `jev-executors.lib.ts`
 plus `jev-executors.catalog.mjs` (the registry of executors per route: facts only,
-no quality ranking), `team-catalog.mjs` (roles, routes, checks).
+no quality ranking), `team-catalog.mjs` (roles, routes, checks). A project adds
+roles in `team-roles.json` and `jev-decide` rubrics in `team-rubrics.json`, both
+beside the board.
 
 ## Rules that always apply
 

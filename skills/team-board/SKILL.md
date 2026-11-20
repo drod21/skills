@@ -33,7 +33,9 @@ fails with `Cannot find package 'arktype'`.
 Retained evidence sits beside it in `tasks.json.artifacts/<task-id>/`; the
 archive and the backup (`tasks.json.bak`) sit there too. Extra roles come from
 `team-roles.json` beside the board or `TEAM_ROLES_FILE` (see
-[roles](../team-coordinator/references/roles.md)).
+[roles](../team-coordinator/references/roles.md)); extra `jev-decide` rubrics come
+from `team-rubrics.json` or `TEAM_RUBRICS_FILE` (see
+[Jev decisions](../team-coordinator/references/jev-decisions.md#project-rubrics)).
 
 ## Statuses and shape
 

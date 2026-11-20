@@ -11,7 +11,7 @@ node "$TOOLKIT/scripts/jev-decide.ts" <input.json> [--dry-run] [--out <result.js
 node "$TOOLKIT/scripts/jev-decide.ts" --rescore <result.json> [--out <rescored.json>] [--force]
 ```
 
-`--rescore` applies today's weights, thresholds, and holds to a saved result's `rawAnswers` and prints the report. It makes no API call and needs no key. A result saved before rubrics existed may inherit a historical rubric name when rescored.
+`--rescore` applies today's weights, thresholds, and holds to a saved result's `rawAnswers` and prints the report. It makes no API call and needs no key. A result saved without a rubric rescores under `general`; a result saved under a project rubric needs the same rubrics file.
 
 `TYPESAFE_API_KEY` must be set for a live call. The script reads it through the SDK and never prints it. Error text replaces the trimmed key with `[redacted]`. `--dry-run` prints the exact request, the request token estimate, and the largest question token estimate, and does not call the API. The default result file is `<input-basename>.result.json` beside the input. Add `**/*.result.json` to the project's `.gitignore`. A result file holds the text that was sent and the absolute input path.
 
@@ -22,8 +22,8 @@ Resolve exact facts from instructions, source, and measurements first. Consult
 Jev before asking the lead when the remaining decision needs semantic judgment;
 do not invent an option choice or paid call for already explicit requirements.
 The toolkit default rubric is `general`, which fits any engineering choice.
-Projects may extend with additional rubrics that keep the same four dimensions
-and four levels each; only the wording differs. Workers pick the rubric that
+A project adds its own rubrics in `team-rubrics.json` beside the board (or the
+file `TEAM_RUBRICS_FILE` names); see [Project rubrics](#project-rubrics). Workers pick the rubric that
 fits the decision. Do not invent measurements or use task routing to select an
 implementation.
 
@@ -102,7 +102,32 @@ the referenced artifact, authenticate `--by`, grant authority, or change routes.
 }
 ```
 
-`rubric` defaults to `general`. The toolkit refuses any name not registered in its decide lib; a project that registers extra rubrics documents which names workers may use. The result records the rubric. Every rubric asks the same four dimensions with four levels each; only the wording differs. Two to twelve options. Each `id` matches `^[a-z][a-z0-9_]{0,47}$`, is unique, and is not `no_good_option`. The id is the Choice label. `context` may be omitted, null, or empty. `decision` and each option `id`, `title`, `description`, and `evidence` must be non-empty strings.
+`rubric` defaults to `general`. The script refuses any name that is neither built in nor in the project's rubrics file, and the result records the rubric. Every rubric asks the same four dimensions with four levels each; only the wording differs. Two to twelve options. Each `id` matches `^[a-z][a-z0-9_]{0,47}$`, is unique, and is not `no_good_option`. The id is the Choice label. `context` may be omitted, null, or empty. `decision` and each option `id`, `title`, `description`, and `evidence` must be non-empty strings.
+
+### Project rubrics
+
+`team-rubrics.json` beside the board, or the file `TEAM_RUBRICS_FILE` names, maps
+rubric names (`^[a-z][a-z0-9_]{0,47}$`) to the same shape as the built-in one:
+
+```json
+{
+  "project_review": {
+    "dimensions": {
+      "evidence": { "question": "...", "levels": ["...", "...", "...", "..."] },
+      "risk": { "question": "...", "levels": ["...", "...", "...", "..."] },
+      "cost": { "question": "...", "levels": ["...", "...", "...", "..."] },
+      "value": { "question": "...", "levels": ["...", "...", "...", "..."] }
+    },
+    "noGood": { "title": "...", "description": "...", "evidence": "..." },
+    "anySound": { "true": "...", "false": "..." }
+  }
+}
+```
+
+Levels run in their natural direction (risk and cost low to high); code inverts
+risk and cost. A file that exists but has another shape, an extra key, or a bad
+name stops the script with the file path. A project rubric never replaces
+`general`.
 
 ## Reading the result
 
