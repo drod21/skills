@@ -1,6 +1,6 @@
 // The thread's server side, against a scratch board built with the real board CLI and the fake `t3` the delivery tests
 // use. Nothing here touches the owner's board or sends to a real T3 thread.
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
@@ -14,6 +14,7 @@ import {
   acceptResponse,
   buildThread,
   leadResponse,
+  listThreads,
   retryResponse,
   sendResponse,
   threadResponse,
@@ -60,6 +61,7 @@ beforeEach(() => {
   const config: Config = {
     cli: CLI,
     repo: join(CLI, '..', '..'),
+    project: join(CLI, '..', '..'),
     boardFile: file,
     node: process.execPath,
     t3: FAKE,
@@ -400,5 +402,24 @@ describe('accepting a held check kicks delivery', () => {
     await deliveryIdle()
     expect(sentLog()).toEqual([])
     expect(acceptEntries()).toEqual([])
+  })
+})
+
+describe('the thread picker', () => {
+  it("lists the project's T3 threads, not the toolkit checkout's", async () => {
+    const argvLog = join(scratch, 'list-argv.json')
+    const listT3 = join(scratch, 'list-t3.mjs')
+    writeFileSync(
+      listT3,
+      `#!/usr/bin/env node
+import { writeFileSync } from 'node:fs'
+writeFileSync(${JSON.stringify(argvLog)}, JSON.stringify(process.argv.slice(2)))
+process.stdout.write('[]')
+`,
+    )
+    chmodSync(listT3, 0o755)
+    const listed = await listThreads({ ...deps.config, t3: listT3, project: '/work/project' })
+    expect(listed).toEqual({ ok: true, value: [] })
+    expect(JSON.parse(readFileSync(argvLog, 'utf8'))).toEqual(['thread', 'list', '--project', '/work/project', '--json'])
   })
 })

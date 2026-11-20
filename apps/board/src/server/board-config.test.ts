@@ -5,12 +5,13 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_PORT, readConfig, tailnetFrom } from './board-config.server'
 
 describe('readConfig', () => {
-  it("defaults to the toolkit's CLI and the working directory's board, on the board's own port", () => {
+  it("defaults to the toolkit's CLI and the working directory's project and board, on the board's own port", () => {
     const config = readConfig({ DEREK_SKILLS: '/opt/toolkit' })
     const repo = '/opt/toolkit'
     expect(config).toEqual({
       cli: join(repo, 'scripts', 'team-tasks.mjs'),
       repo,
+      project: process.cwd(),
       boardFile: join(process.cwd(), 'tasks.json'),
       node: 'node',
       t3: existsSync(join(homedir(), '.t3', 'bin', 't3')) ? join(homedir(), '.t3', 'bin', 't3') : 't3',
@@ -23,6 +24,7 @@ describe('readConfig', () => {
   it('lets a test point the app at another CLI and board', () => {
     const config = readConfig({
       TEAM_BOARD_CLI: '/work/checkout/scripts/team-tasks.mjs',
+      TEAM_BOARD_PROJECT: '/work/project',
       TEAM_TASKS_FILE: '/tmp/scratch/tasks.json',
       TEAM_BOARD_BUILD_SHA: 'abc1234',
       PORT: '4791',
@@ -30,10 +32,15 @@ describe('readConfig', () => {
     expect(config).toMatchObject({
       cli: '/work/checkout/scripts/team-tasks.mjs',
       repo: '/work/checkout',
+      project: '/work/project',
       boardFile: '/tmp/scratch/tasks.json',
       buildSha: 'abc1234',
       port: 4791,
     })
+  })
+
+  it("reads the board from the project's checkout unless TEAM_TASKS_FILE names another", () => {
+    expect(readConfig({ TEAM_BOARD_PROJECT: '/work/project' }).boardFile).toBe('/work/project/tasks.json')
   })
 
   it.each(['0', '65536', 'abc', '47.5', '-1'])('refuses PORT=%s', (port) => {
