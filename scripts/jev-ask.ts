@@ -16,7 +16,12 @@ import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { image, TypeSafeClient } from '@typesafe-ai/sdk'
-import { evidenceDigest, readScopedEvidence } from './evidence-scope.mjs'
+import {
+  evidenceContentId,
+  evidenceDigest,
+  readScopedEvidence,
+  retainedEvidenceContentId,
+} from './evidence-scope.mjs'
 
 import {
   ASK_THRESHOLDS,
@@ -36,12 +41,17 @@ import {
 } from './jev-ask.lib.ts'
 import {
   assertApiKeyAbsent,
-  cleanText,
+  cleanText as guardText,
   redactApiKey,
   secretFileReason,
   secretInText,
   tailText,
 } from './jev-guard.lib.ts'
+
+// The SDK refuses a request whose text still holds an image reference token, since no image backs it.
+function cleanText(value: unknown, field: string, allowEmpty = false, maxChars?: number) {
+  return guardText(value, field, allowEmpty, maxChars).replace(/<image:[0-9a-f]{32}>/g, '[image reference]')
+}
 
 const USAGE =
   'usage: node scripts/jev-ask.ts (--yes-no <q> | --pick a,b[,c,d] --question <q> | --preset flaky_or_real|blocker_or_nit|clipped_text | --check-evidence [--preflight] --summary <text> [--phase <checkpoint> --current-evidence <retained-path> ...]) [--context <text> | --context-file <path>] [--image <png|jpg>] [--task <id> --by <owner> | --out <dir>]'
@@ -395,12 +405,17 @@ function loadOne(item: string, hashes?: Map<string, string>): EvidenceItem {
   const name = basename(item)
   const refused = secretFileReason(name)
   if (refused) return { name, sent: false, why: refused }
+  const contentId = retainedEvidenceContentId(item)
+  const unverified = () =>
+    new Error(`retained evidence checksum could not be verified: ${name}; reattach the original file`)
   let bytes: Buffer | null
   try {
     bytes = hashes ? readScopedEvidence(item) : fileBytes(item)
   } catch {
+    if (contentId !== null) throw unverified()
     return { name, sent: false, why: 'not a readable absolute retained file of at most 25 MiB' }
   }
+  if (contentId !== null && (!bytes || evidenceContentId(bytes) !== contentId)) throw unverified()
   if (!bytes) return { name, sent: false, why: 'not a readable file' }
   hashes?.set(item, evidenceDigest(bytes))
   const kind = imageKind(bytes)

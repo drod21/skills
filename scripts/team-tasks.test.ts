@@ -2005,6 +2005,22 @@ describe('done gate', () => {
     expect(byId(1).decisions ?? []).toEqual([])
   })
 
+  it('accepts a hold on an ungated task whose evidence is a local file it never retained', () => {
+    const local = join(dir, 'notes.md')
+    writeFileSync(local, 'checked by hand\n')
+    seed(
+      task(1, {
+        status: 'claimed',
+        owner: 'worker',
+        evidence: [local],
+        decisions: [judgment({ outcome: 'hold', answer: null, evidence: [local] })],
+      }),
+    )
+    const result = cli('accept', '1', '--reason', 'because', '--by', 'lead')
+    expect(result.stderr).toBe('')
+    expect(result.status).toBe(0)
+  })
+
   it('accept refuses a rejected check, a confirmed check, no check, and empty evidence', () => {
     seed(task(1, { status: 'claimed', owner: 'worker', accept: 'labels fit', evidence: ['a.png'] }))
     expect(cli('accept', '1', '--reason', 'because', '--by', 'lead').stderr).toContain('no check')
@@ -2228,6 +2244,150 @@ describe('archive recovery', () => {
 })
 
 describe('durable evidence', () => {
+  it.each(['symlink', 'oversized'] as const)(
+    'refuses %s file evidence on gated tasks without changing the board',
+    (kind) => {
+      seed(task(1, { status: 'claimed', owner: 'me', accept: 'Review evidence' }))
+      const source = join(dir, 'report.txt')
+      const link = join(dir, 'link.txt')
+      const big = join(dir, 'big.txt')
+      writeFileSync(source, 'original')
+      symlinkSync(source, link)
+      writeFileSync(big, '')
+      truncateSync(big, 25 * 1024 * 1024 + 1)
+      const result = cli('evidence', '1', kind === 'symlink' ? link : big)
+      expect(result.status).toBe(1)
+      expect(result.stderr).toMatch(/retain|evidence/i)
+      expect(byId(1).evidence ?? []).toEqual([])
+    },
+  )
+
+  it.each(['confirmed', 'hold'] as const)('blocks %s for legacy mutable local evidence', (outcome) => {
+    const legacy = join(dir, 'legacy.txt')
+    writeFileSync(legacy, 'checked content')
+    seed(task(1, { status: 'claimed', owner: 'me', accept: 'Review evidence', evidence: [legacy] }))
+    const verdict = cli('judgment', '1', JSON.stringify(judgment({ by: 'me', outcome, evidence: [legacy] })))
+    expect(verdict.status, verdict.stderr).toBe(0)
+    writeFileSync(legacy, 'changed content')
+    const action =
+      outcome === 'hold' ? ['accept', '1', '--reason', 'Reviewed', '--by', 'lead'] : ['done', '1', '--owner', 'me']
+    const result = cli(...action)
+    expect(result.status).toBe(1)
+    expect(result.stderr).toMatch(/retain|evidence/i)
+    expect(byId(1).status).toBe('claimed')
+    const reattached = cli('evidence', '1', legacy)
+    expect(reattached.status, reattached.stderr).toBe(0)
+    const [retained] = reattached.json.evidence as [string]
+    expect(retained).not.toBe(legacy)
+    expect(readFileSync(retained, 'utf8')).toBe('changed content')
+    expect(cli(...action).status).toBe(1)
+    const fresh = cli('judgment', '1', JSON.stringify(judgment({ by: 'me', outcome, evidence: [retained] })))
+    expect(fresh.status, fresh.stderr).toBe(0)
+    expect(cli(...action).status).toBe(0)
+  })
+
+  it('preserves non-file references on gated tasks', () => {
+    seed(task(1, { status: 'claimed', owner: 'me', accept: 'Review evidence' }))
+    const refs = ['https://example.com/proof', 'plain note']
+    const added = cli('evidence', '1', ...refs)
+    expect(added.status, added.stderr).toBe(0)
+    expect(added.json.evidence).toEqual(refs)
+  })
+
+  it('refuses to start a check on an existing legacy file until it is retained', () => {
+    const legacy = join(dir, 'legacy.txt')
+    writeFileSync(legacy, 'report')
+    seed(task(1, { status: 'claimed', owner: 'me', accept: 'Review evidence', evidence: [legacy] }))
+    const start = (evidence: string[]) =>
+      cli('check-start', '1', JSON.stringify({ by: 'me', token: 'check', evidence, basis: 0 }))
+    expect(start([legacy]).status).toBe(1)
+    const reattached = cli('evidence', '1', legacy)
+    expect(reattached.status, reattached.stderr).toBe(0)
+    expect(start(reattached.json.evidence).status).toBe(0)
+  })
+
+  it('replaces a legacy symlink only when a same-named regular reattachment has the same bytes', () => {
+    const linkDir = join(dir, 'links')
+    const copyDir = join(dir, 'copies')
+    mkdirSync(linkDir)
+    mkdirSync(copyDir)
+    const target = join(dir, 'original.txt')
+    const legacy = join(linkDir, 'report.txt')
+    const copy = join(copyDir, 'report.txt')
+    writeFileSync(target, 'checked content')
+    symlinkSync(target, legacy)
+    writeFileSync(copy, 'different content')
+    seed(task(1, { status: 'claimed', owner: 'me', accept: 'Review evidence', evidence: [legacy] }))
+    expect(cli('evidence', '1', copy).json.evidence).toContain(legacy)
+    writeFileSync(copy, 'checked content')
+    const result = cli('evidence', '1', copy)
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.json.evidence).not.toContain(legacy)
+    expect(result.json.evidence.some((item: string) => readFileSync(item, 'utf8') === 'checked content')).toBe(true)
+  })
+
+  it.each(['confirmed', 'hold'] as const)('blocks completion with damaged %s evidence until repaired', (outcome) => {
+    seed(task(1, { status: 'claimed', owner: 'me', accept: 'Review the report' }))
+    const source = join(dir, 'report.txt')
+    writeFileSync(source, 'original report')
+    const attached = cli('evidence', '1', source)
+    expect(attached.status, attached.stderr).toBe(0)
+    const [retained] = attached.json.evidence as [string]
+    const verdict = cli('judgment', '1', JSON.stringify(judgment({ by: 'me', outcome, evidence: [retained] })))
+    expect(verdict.status, verdict.stderr).toBe(0)
+    rmSync(retained)
+    writeFileSync(retained, 'damaged report')
+
+    const action =
+      outcome === 'hold' ? ['accept', '1', '--reason', 'Reviewed', '--by', 'lead'] : ['done', '1', '--owner', 'me']
+    const refused = cli(...action)
+    expect(refused.status).toBe(1)
+    expect(refused.stderr).toMatch(/retained evidence.*checksum/i)
+    expect(byId(1).status).toBe('claimed')
+
+    expect(cli('evidence', '1', source).status).toBe(0)
+    expect(cli(...action).status).toBe(0)
+  })
+
+  it('restores a damaged retained copy when the original bytes are reattached', () => {
+    seed(task(1))
+    const source = join(dir, 'report.txt')
+    writeFileSync(source, 'original report')
+    const first = cli('evidence', '1', source)
+    expect(first.status, first.stderr).toBe(0)
+    const [retained] = first.json.evidence as [string]
+    rmSync(retained)
+    writeFileSync(retained, 'damaged report')
+
+    const repaired = cli('evidence', '1', source)
+    expect(repaired.status, repaired.stderr).toBe(0)
+    expect(repaired.json.evidence).toEqual([retained])
+    expect(readFileSync(retained, 'utf8')).toBe('original report')
+  })
+
+  it('pins a gated task’s local evidence to the attached bytes', () => {
+    seed(task(1, { status: 'claimed', owner: 'me', accept: 'Review the report' }))
+    const directory = mkdtempSync(join(import.meta.dirname, '..', '.team-tasks-evidence-'))
+    const report = join(directory, 'report.txt')
+    try {
+      writeFileSync(report, 'first report')
+      const first = cli('evidence', '1', report)
+      expect(first.status, first.stderr).toBe(0)
+      const [firstCopy] = first.json.evidence as string[]
+      expect(firstCopy).not.toBe(report)
+      writeFileSync(report, 'second report')
+      expect(readFileSync(firstCopy!, 'utf8')).toBe('first report')
+
+      const second = cli('evidence', '1', report)
+      expect(second.status, second.stderr).toBe(0)
+      const copies = second.json.evidence as string[]
+      expect(copies.map((copy) => readFileSync(copy, 'utf8'))).toEqual(['first report', 'second report'])
+      expect(cli('evidence', '1', report).json.evidence).toEqual(copies)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
   it('copies nothing when the board would refuse the write', () => {
     seed(task(1, { status: 'claimed', owner: 'a' }))
     const secret = join(dir, '.env')

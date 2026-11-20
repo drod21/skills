@@ -83,6 +83,11 @@ describe('board path', () => {
     expect(resolveBoardFile()).toBe(join(dir, 'custom.json'))
   })
 
+  it('resolves a relative TEAM_TASKS_FILE against the working directory', () => {
+    process.env.TEAM_TASKS_FILE = 'boards/custom.json'
+    expect(resolveBoardFile()).toBe(join(process.cwd(), 'boards', 'custom.json'))
+  })
+
   it('finds the board beside the git common dir of the working directory, shared by worktrees', () => {
     const repo = join(dir, 'repo')
     mkdirSync(repo)
