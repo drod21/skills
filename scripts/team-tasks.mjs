@@ -116,6 +116,7 @@ const USAGE = [
   '                                          lead accepts evidence when the latest check is a hold and',
   '                                          no decision but a release followed it.',
   '                                          --by must differ from the task owner',
+  '  help [<command>]                        print this usage, or one command\'s lines',
   '  show <id> [--full]                      print one task, merging the archive for a stub.',
   '                                          Raw Jev answers only with --full',
   '  decide <id> --summary <text> [--ref <path>] [--by <owner>]',
@@ -738,13 +739,20 @@ const COMMANDS = {
 const COMMAND_NAMES = `commands: ${Object.keys(COMMANDS).join(', ')}
 run team-tasks.mjs help <command> for one command's usage, or help for all of it`
 
+// Free text is flattened so a title or owner cannot print a second task line or shift a column.
+const CONTROL_OR_SPACE = /[\x00-\x1f\x7f\s]+/g
+const column = (value) => (value == null || value === '' ? '-' : String(value).replace(CONTROL_OR_SPACE, '_'))
+const flatText = (value) => String(value ?? '').replace(CONTROL_OR_SPACE, ' ').trim()
+
 function taskLine(task) {
   const after = task.after?.length ? ` after=${task.after.join(',')}` : ''
-  const tag = task.tag ? ` tag=${task.tag}` : ''
-  return `#${task.id} ${task.status} ${task.role} ${task.owner ?? '-'} ${task.route ?? '-'}${after}${tag} ${task.title}`
+  const tag = task.tag ? ` tag=${column(task.tag)}` : ''
+  const fields = [task.status, task.role, task.owner, task.route].map(column).join(' ')
+  return `#${task.id} ${fields}${after}${tag} ${flatText(task.title)}`
 }
 
-async function run(file, [command, ...args]) {
+async function run(file, [given, ...args]) {
+  const command = given === '--help' || given === '-h' ? 'help' : given
   const handler = Object.hasOwn(COMMANDS, command ?? '') ? COMMANDS[command] : null
   if (!handler) {
     console.error(`${command ? `unknown command ${command}. ` : ''}${COMMAND_NAMES}`)

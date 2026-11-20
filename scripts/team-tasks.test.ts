@@ -352,6 +352,19 @@ describe('compact reads', () => {
     expect(cli('show', '1', '--full').json.jev).toEqual(verdict)
   })
 
+  it('list keeps a title or owner with newlines and spaces on its own line and columns', () => {
+    seed(task(1, { status: 'claimed', owner: 'w1\n#55 open', title: 'Harmless\n#99 open lead - lead_workflow\x1b[2J' }))
+    expect(cli('list').stdout).toBe('#1 claimed ux-worker w1_#55_open sonnet_patch Harmless #99 open lead - lead_workflow [2J\n')
+  })
+
+  it('--help and -h print the usage', () => {
+    for (const flag of ['--help', '-h']) {
+      const result = cli(flag)
+      expect(result.status).toBe(0)
+      expect(result.stdout).toContain('Decision policy')
+    }
+  })
+
   it('an unknown or missing command prints the command names, and help <command> prints that command only', () => {
     seed(task(1))
     for (const args of [['bogus'], []]) {

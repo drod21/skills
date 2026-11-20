@@ -148,6 +148,6 @@ export function liveTasks(
 ): { id: number; title: string; role: string; tag?: string; owner: string | null; status: string }[] {
   return cliJson<{ id: number; title: string; role: string; tag?: string; owner: string | null; status: string }[]>(
     file,
-    ['list'],
+    ['list', '--json'],
   )
 }
