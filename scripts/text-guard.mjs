@@ -31,6 +31,19 @@ const SECRET_SHAPES = [
   ],
 ]
 
+// A file that holds credentials is never read for Jev, whatever its text looks like.
+const SECRET_NAME = /^(\.env(\..*)?|\.npmrc|\.netrc|id_(rsa|dsa|ecdsa|ed25519))$|\.(pem|key|p12|pfx|keystore|jks)$/i
+
+/**
+ * Why a file must not be read for Jev or retained beside the board, or null. Checked on the name before any bytes
+ * are read. team-tasks keeps the basename when it retains evidence (`<id>/<sha12>/<name>`), so a copy is caught too.
+ * @param {string} name
+ * @returns {string | null}
+ */
+export function secretFileReason(name) {
+  return SECRET_NAME.test(name) ? 'looks like a credentials file; never sent' : null
+}
+
 /**
  * What kind of credential `text` seems to hold, or null.
  * @param {string} text
