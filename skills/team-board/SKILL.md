@@ -71,6 +71,9 @@ Owner thread: `ask-owner <id> <question...> --by who [--packet file.json]`,
 <id> --by lead`, `lead-reply <id> <reply...> --by lead`, `answer-read <id> --by
 worker`; `answer` and `note` accept `--expected <review-revision>`. `deliver
 [--task id] [--limit n]` sends due outbox records through the optional T3 adapter.
+Each message starts `<label>, task <id>: <title>`; `TEAM_BOARD_LABEL` sets the
+label (default `Team board`), and its commands name `TEAM_TASKS_SCRIPT`, else
+the toolkit's own `team-tasks.mjs`.
 
 Review: `review <id> findings.json --by owner`, `review-report <id>`.
 

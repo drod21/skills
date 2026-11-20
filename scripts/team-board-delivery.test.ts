@@ -775,6 +775,13 @@ describe('accept delivery', () => {
       expect(message).toContain(`Read it:     node ${scriptPath()} show ${id}`)
     })
 
+    it('names the board with TEAM_BOARD_LABEL on the first line', () => {
+      const id = heldTask()
+      expect(accept(id).status).toBe(0)
+      expect(cli({ TEAM_BOARD_LABEL: '  Release\n board ' }, 'deliver').json.sent).toBe(1)
+      expect(sends()[0].stdin.split('\n')[0]).toBe(`Release board, task ${id}: Retry the flaky job`)
+    })
+
     it('shows any other accepter by name', () => {
       const id = heldTask()
       const message = sentMessage(id, 'area-lead')

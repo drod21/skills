@@ -21,6 +21,12 @@ export function boardScriptPath() {
   return resolve(dirname(fileURLToPath(import.meta.url)), 'team-tasks.mjs')
 }
 
+/** The first words of a delivered message: TEAM_BOARD_LABEL, else "Team board". */
+export function boardLabel() {
+  const label = (process.env.TEAM_BOARD_LABEL ?? '').replace(/\s+/g, ' ').trim()
+  return label || 'Team board'
+}
+
 /** Trim stored `--by` / `--reason` text. Blank is absent. */
 export function storedText(value) {
   if (typeof value !== 'string') return null
@@ -352,7 +358,7 @@ function messageText(board, task, record, scriptPath) {
   const script = /^[\w./-]+$/.test(scriptPath) ? scriptPath : `'${scriptPath.replaceAll("'", "'\\''")}'`
   const show = `node ${script} show ${task.id}`
   return [
-    `Team board, task ${task.id}: ${String(task.title).replace(/\s+/g, ' ').slice(0, 200)}`,
+    `${boardLabel()}, task ${task.id}: ${String(task.title).replace(/\s+/g, ' ').slice(0, 200)}`,
     headlineFor(record.entryKind, entry),
     '---',
     String((record.entryKind === 'accept' ? entry?.reason : entry?.text) ?? '').slice(0, MESSAGE_LIMIT),
