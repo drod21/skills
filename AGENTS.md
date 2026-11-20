@@ -130,7 +130,8 @@ The project provides, and the skills assume:
 Optional board app: from the toolkit root, `pnpm install` once, then `pnpm --filter @derek-skills/board build`
 and `pnpm --filter @derek-skills/board start` (or `pnpm board:dev` for Vite, port 4788). The default Nitro
 preset still needs the Bun runtime to serve `.output/server/index.mjs`. Run the server from the project
-checkout so it reads `./tasks.json` (override `TEAM_TASKS_FILE`); it shells out to the toolkit's
+checkout so it reads `./tasks.json` (override `TEAM_TASKS_FILE`; `TEAM_BOARD_PROJECT` names the project
+checkout and defaults to the board file's directory, else the working directory); it shells out to the toolkit's
 `team-tasks.mjs` and refuses any non-loopback bind. Writes need the session token; tailnet access is
 opt-in through `TEAM_BOARD_TAILNET_HOST` and `TEAM_BOARD_TAILNET_LOGINS`.
 

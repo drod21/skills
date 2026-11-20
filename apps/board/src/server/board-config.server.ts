@@ -1,7 +1,7 @@
 // The one module that reads the process environment. Everything else gets the parsed Config.
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { type } from 'arktype'
 
 export const DEFAULT_PORT = 4788
@@ -61,7 +61,9 @@ export function readConfig(env: Record<string, string | undefined>): Config {
   const toolkit = env.DEREK_SKILLS || join(homedir(), 'derek-skills')
   const cli = parsed.TEAM_BOARD_CLI ?? join(toolkit, 'scripts', 'team-tasks.mjs')
   const repo = dirname(dirname(cli))
-  const project = parsed.TEAM_BOARD_PROJECT ?? process.cwd()
+  const project = resolve(
+    parsed.TEAM_BOARD_PROJECT ?? (parsed.TEAM_TASKS_FILE ? dirname(parsed.TEAM_TASKS_FILE) : process.cwd()),
+  )
   return {
     cli,
     repo,
