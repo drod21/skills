@@ -270,6 +270,7 @@ function usageFor(command) {
 }
 
 function refuseUnknownFlags(command, args) {
+  if (!Object.hasOwn(FLAGS, command)) throw new Error(`${command} has no flag list in team-tasks.mjs FLAGS`)
   const unknown = args.find((arg) => FLAG_SHAPE.test(arg) && !FLAGS[command].includes(arg))
   if (unknown) throw new Error(`${command} takes no ${unknown}. ${usageFor(command)}`)
 }
