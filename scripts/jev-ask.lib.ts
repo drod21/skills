@@ -52,6 +52,7 @@ export const GAPS = {
 } as const
 
 // Without this line Jev reads a test-first task's required red run as a failed check.
+export const CHECK_FITS_QUESTION = 'Does the attached evidence show that every condition in `task.accept` is met?'
 const RED_RUN = 'This team follows TDD: a test-writing task is done when its new tests fail on the unchanged code for the reason the task states. When `task.accept` asks for a test to fail, a test that fails for the stated reason meets it, and a passing test would not.'
 
 export type Gap = keyof typeof GAPS
@@ -128,7 +129,7 @@ export function buildCheckRequest(
   return {
     state: { task, summary, ...evidence },
     questions: {
-      fits: noul(`${scope}Does the attached evidence show that every condition in \`task.accept\` is met? ${RED_RUN}`),
+      fits: noul(`${scope}${CHECK_FITS_QUESTION} ${RED_RUN}`),
       gap: choice(`${scope}Which gap label fits the evidence against \`task.accept\`? ${RED_RUN}`, GAPS),
     },
   }
