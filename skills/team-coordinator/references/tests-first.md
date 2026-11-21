@@ -11,7 +11,8 @@ fixing tests after the build.
 2. **Test task.** Add a test task per unit ahead of the build task, routed to the
    lightest executor that can carry it, with an `--accept` that names why the
    tests fail on the unchanged code ("fails on main because install does not
-   retry"); without that reason the evidence check holds the task. Its brief is the acceptance cases, the
+   retry"); without that reason the evidence check can hold the task. Its brief
+   is the acceptance cases, the
    lead's numbered owner and lead decisions those cases depend on (quoted, with
    each case citing the decision number it encodes), and the allowed test and
    minimal-contract paths, nothing about how to build. The
