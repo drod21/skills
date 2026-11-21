@@ -1,6 +1,6 @@
 ---
 name: team-board
-description: Operate the team task board (team-tasks.mjs): add, claim, evidence, decide, route, done, ask-owner, reviews, archive, doctor. Load when reading or changing board state or a board message.
+description: "Operate the team task board (team-tasks.mjs): add, claim, evidence, decide, route, done, ask-owner, reviews, archive, doctor. Load when reading or changing board state or a board message."
 ---
 
 # Team task board

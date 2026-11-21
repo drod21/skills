@@ -1,6 +1,6 @@
 ---
 name: pr-delivery
-description: Load before review findings, a handoff, a pull request or a completion claim: finish every required validation stage and report each session-owned resource with owner and state.
+description: "Load before review findings, a handoff, a pull request or a completion claim: finish every required validation stage and report each session-owned resource with owner and state."
 user-invocable: false
 ---
 

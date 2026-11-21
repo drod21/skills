@@ -122,6 +122,7 @@ full chain, who records what, and the commands:
 | Jev on browser or device evidence, handoffs, filtering large evidence | [Jev execution](references/jev-execution.md#when-to-cross-check-with-jev) |
 | The done gate and judgments | [Jev team](references/jev-team.md) |
 | Owner review packets, screenshots, video | [review queue](references/review-queue.md) |
+| Writing a project's own worker hooks (spec preflight, verifier briefs, device slots) | [project hook examples](references/project-hooks.md) |
 
 ## Board health and verification
 

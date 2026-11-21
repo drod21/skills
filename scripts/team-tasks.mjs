@@ -648,7 +648,7 @@ const COMMANDS = {
     if (tasks.length) console.log(tasks.map(taskLine).join('\n'))
   },
   help(file, args) {
-    if (args.length > 1) throw new Error('usage: help [<command>]')
+    if (args.length > 1) throw new Error('usage: help [<command>|policy]')
     if (!args.length) return console.log(USAGE)
     if (args[0] === 'policy') return console.log(POLICY)
     if (!Object.hasOwn(COMMANDS, args[0])) throw new Error(`unknown command ${args[0]}. ${COMMAND_NAMES}`)
