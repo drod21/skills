@@ -28,6 +28,7 @@ import {
   PRESETS,
   buildAskRequest,
   buildCheckRequest,
+  CHECK_FITS_QUESTION,
   hashRequest,
   readAsk,
   readCheck,
@@ -486,7 +487,7 @@ function askFrom(args: AskArgs): Ask {
 
 function journalQuestion(args: AskArgs, ask: Ask | null) {
   if (args.mode === 'preset') return args.preset ?? ''
-  if (args.mode === 'check') return 'Does the attached evidence show that `task.accept` passed?'
+  if (args.mode === 'check') return CHECK_FITS_QUESTION
   return ask?.question ?? args.question
 }
 
