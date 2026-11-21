@@ -449,6 +449,7 @@ describe('brief', () => {
   it('prints test and verify briefs', () => {
     seed(task(1))
     expect(cli('brief', '1', '--kind', 'test').stdout).toContain('red run')
+    expect(cli('brief', '1', '--kind', 'test').stdout).toContain('Expected failure: <each test fails because')
     expect(cli('brief', '1', '--kind', 'verify').stdout).toContain('never ask the owner')
   })
 
