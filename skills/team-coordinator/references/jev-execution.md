@@ -136,3 +136,72 @@ disposition and score product. Empty findings explicitly record a clean review.
 Legacy tasks remain usable; every newly dispatched reviewer task must use
 `--review`. As with existing judgments, recorded identities and evidence
 references are a coordination protocol, not authenticated proof.
+
+## When to cross-check with Jev
+
+Use Jev at meaningful verification checkpoints and when interpreting evidence
+needs judgment; do not add a paid call for every click or routine lookup. The
+lead plans and writes; Jev selects or evaluates supplied evidence and options.
+
+- **Browser work:** capture the affected page after the relevant interaction with
+  the harness-authorized browser tools. Give Jev the screenshot, expected
+  behavior, viewport and steps. Use `jev-ask.ts --preset clipped_text` for
+  clipping or overlap, `--yes-no` for a specific acceptance question, `--pick`
+  with two to four concrete authorized options for an ambiguous next action.
+  Inspect the page yourself and verify navigation, persistence and network claims
+  through the actual browser; a screenshot judgment proves only what it shows.
+- **Simulator or emulator work:** run the affected flow with the authorized
+  device tools and capture each changed surface. Give Jev current screenshots,
+  platform and device, build identity, steps and expected state. Include logs
+  with `flaky_or_real` when diagnosing a failure. Re-run the real interaction
+  after a fix. Keep simulator, physical-device and backend evidence distinct;
+  Jev's interpretation never establishes unseen behavior such as audible playback.
+- **Context compaction and resume:** before a planned compaction or durable
+  handoff, retain a summary with the objective, exact user constraints and
+  authorization, checkout/branch/HEAD, changed files, decisions and rationale,
+  evidence paths and results, unresolved findings and scores, owned resources,
+  active task IDs, blockers and next action. Ask Jev a bounded `--yes-no`
+  question comparing the original excerpts with the proposed summary for
+  omissions or changed meaning. `--context` and `--context-file` retain only the
+  last 3,000 characters, so keep each comparison inside that and split larger
+  handoffs by topic. Correct confirmed omissions, and on resume re-read the
+  retained artifacts and reconcile the live checkout, tasks and resources.
+
+Selection, filtering and progress patterns, all within the authorized task:
+
+- **Ground UI choices in observed controls.** Enumerate up to three plausible
+  controls from the current DOM or accessibility snapshot and run `jev-ui.ts`;
+  keep each option mapped to the observed locator. Execute through authorized
+  tools, then take fresh evidence; never invent a selector or reuse a target after
+  the screen changes.
+- **Check progress before repeating an action.** Compare goal, before/after state
+  and recent actions. Use bounded questions or choices to distinguish completion,
+  ambiguity, an error, a blocker and no progress. Confirm observable completion
+  directly. When an action repeats without progress or Jev is unsure, inspect the
+  state and return the judgment to the lead. Jev's choice never authorizes an
+  external action.
+- **Select context before summarizing.** Pin user constraints, authorization,
+  accepted decisions, active work, blockers and evidence references first. Give
+  remaining transcript sections stable IDs and ask whether each contains facts
+  needed for the current goal. Keep uncertain or unjudged sections. The lead
+  writes the summary of sections selected for compression and preserves the
+  original artifacts. Check that concrete facts from compressed sections can still
+  be recovered from the summary plus retained context.
+- **Filter large evidence by relevance.** Split long research pages,
+  documentation or logs into identified sections with source URLs or paths and
+  offsets. Ask which sections help answer the actual task question. Return
+  original excerpts in source order, record omitted section IDs and reasons, and
+  retain the full artifact. Keep uncertain sections; a filtered excerpt is not
+  proof that the full source contains no other evidence.
+- **Evaluate content meaning.** For website or content work already in scope,
+  provide the intended audience, search intent, page text and concrete criteria.
+  Ask whether headings match the body and whether the page answers its intended
+  question. The agent writes revisions; code checks metadata, links and schema.
+  Semantic judgments are editorial evidence, not measured rankings. Apply the
+  review threshold to proposed fixes.
+- **Batch related judgments.** Prefer one bounded state with multiple typed
+  questions over re-sending the same artifact for each question. Use
+  `jev-batch.ts` for multiple questions and `jev-select.ts` for filtering or
+  compaction selection; they retain complete bounded inputs and split requests
+  instead of tail-truncating. `jev-ui.ts` supplies a bounded action protocol and
+  `runUiFlow` runs observe/choose/act/verify through supplied harness adapters.

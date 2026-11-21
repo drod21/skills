@@ -1,6 +1,6 @@
 ---
 name: chief-of-staff
-description: Pursue a long-running goal in a single session by coordinating subagents, a wiki of tribal knowledge, and recurring schedules. Load when the user hands over a goal that will outlive one task or one context window.
+description: Pursue a long-running goal by coordinating subagents, a tribal-knowledge wiki and recurring schedules. Load when the user hands over a goal that outlives one task or context window.
 disable-model-invocation: true
 ---
 

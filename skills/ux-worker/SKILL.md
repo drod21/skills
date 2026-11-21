@@ -1,6 +1,7 @@
 ---
 name: ux-worker
 description: Handle ux-worker tasks for web or mobile layout, navigation, copy and interaction, including affected-platform visual verification.
+disable-model-invocation: true
 ---
 
 # UX worker

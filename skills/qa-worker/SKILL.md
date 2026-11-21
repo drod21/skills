@@ -1,6 +1,7 @@
 ---
 name: qa-worker
 description: Handle qa-worker tasks for independent behavioral tests, regression reproduction and runtime acceptance evidence on the assigned checkout and platform.
+disable-model-invocation: true
 ---
 
 # QA worker
@@ -26,7 +27,7 @@ do not create persistent automation merely for a smoke check. Keep test-data
 mutations scoped and report them. Do not loosen assertions, refresh goldens or tune
 production thresholds just to obtain a green result.
 
-When you are the test worker in [tests first](../team-coordinator/SKILL.md#tests-first),
+When you are the test worker in [tests first](../team-coordinator/references/tests-first.md),
 write only tests and the minimal compile-time contract, commit them first, and
 return the SHA, the locked files, the run command and a red run with zero skips.
 

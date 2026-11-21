@@ -1,6 +1,7 @@
 ---
 name: perf-worker
 description: Handle perf-worker tasks for measured query, render, startup, memory and inference bottlenecks; establish comparable before/after evidence for scoped optimizations.
+disable-model-invocation: true
 ---
 
 # Performance worker

@@ -507,7 +507,9 @@ function refuseCliIdentityWithTask(args: string[], taskId: string | undefined) {
 if (isDirectRun()) {
   try {
     const args = process.argv.slice(2)
-    if (args.includes('--calibrate')) {
+    if (args[0] === '--help' || args[0] === '-h') {
+      console.log(USAGE)
+    } else if (args.includes('--calibrate')) {
       runCalibrate(args.includes('--json'))
     } else {
       const taskId = readTaskFlag(args)

@@ -1,6 +1,7 @@
 ---
 name: security-worker
 description: Handle security-worker tasks for authentication, account isolation, input validation, secrets handling and scoped access-control reviews or fixes.
+disable-model-invocation: true
 ---
 
 # Security worker

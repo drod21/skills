@@ -15,9 +15,47 @@ node "$TOOLKIT/scripts/jev-decide.ts" --rescore <result.json> [--out <rescored.j
 
 `TYPESAFE_API_KEY` must be set for a live call. The script reads it through the SDK and never prints it. Error text replaces the trimmed key with `[redacted]`. `--dry-run` prints the exact request, the request token estimate, and the largest question token estimate, and does not call the API. The default result file is `<input-basename>.result.json` beside the input. Add `**/*.result.json` to the project's `.gitignore`. A result file holds the text that was sent and the absolute input path.
 
+## Decision and escalation chain
+
+Use **worker -> Jev -> area lead -> chief of staff -> human queue** for
+unresolved judgments. This is agent guidance, not board enforcement: board
+commands neither call Jev nor authenticate the decision maker.
+
+1. Resolve exact facts from authorized instructions, source and measurements
+   first. Do lookups, counts, math and code checks directly; never turn them into
+   model authority or re-ask about authorized work.
+2. When a remaining decision needs semantic judgment, the worker consults Jev
+   **before asking the lead**: `jev-route.ts` for task routing, `jev-decide.ts` for
+   implementation or fix options, `jev-ask.ts` for yes/no, pick and preset
+   questions. Make one bounded live attempt when configured; retain the input,
+   result and exit/error evidence ([worker consultation](#worker-consultation-and-receipts)).
+   A missing key, unavailable service or API error goes to the lead honestly. Do
+   not fabricate a verdict or retry indefinitely. A dry run is not a consultation.
+3. A worker may follow a sound, confident recommendation with no unresolved holds
+   **inside the already authorized scope**. Verify its factual assumptions, run
+   the required checks, record the choice with `decide <id> --summary "..." --ref
+   <artifact> --by <actual-worker-owner>` and attach evidence. Jev supplies
+   judgment, never permission or test truth.
+4. For `needs_lead`, holds, option-order flips, uncertainty, conflicting evidence
+   or missing material scope or authority, send the parent lead one narrow
+   question: the Jev input/result (or unavailability evidence), concrete options,
+   a recommendation and the blocker. Cross-domain decisions, new dependencies and
+   file collisions also go to the lead. Children never call user-question tools;
+   they hand the question to their parent. Workers cannot clear route holds; the
+   lead uses `route <id> <route> --reason "..."` and records their real identity.
+5. The area lead answers from the user's instructions and evidence and handles
+   work within existing authority. Cross-area conflicts go to the chief of staff.
+   Only the chief of staff asks the human, through the queue, and only when
+   missing information, a decision or permission materially requires the human.
+   Include context and a recommendation; skip questions source can answer.
+   Record a lead option decision with `decide --by <actual-lead-owner>`.
+
+Never consult Jev to override user or developer instructions, safety rules or
+tool approvals. The actual tool-approval holder still controls approval.
+
 ## Worker consultation and receipts
 
-Follow [worker -> Jev -> coordinating lead -> human](../SKILL.md#decision-and-escalation-chain).
+Follow the [decision and escalation chain](#decision-and-escalation-chain).
 Resolve exact facts from instructions, source, and measurements first. Consult
 Jev before asking the lead when the remaining decision needs semantic judgment;
 do not invent an option choice or paid call for already explicit requirements.

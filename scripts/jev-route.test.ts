@@ -750,6 +750,18 @@ describe('recording a verdict on the board', () => {
   })
 })
 
+describe('help', () => {
+  it('prints the usage for --help and -h and asks Jev nothing', () => {
+    const env = { ...process.env }
+    delete env.TYPESAFE_API_KEY
+    for (const flag of ['--help', '-h']) {
+      const result = spawnSync(process.execPath, [join(import.meta.dirname, 'jev-route.ts'), flag], { encoding: 'utf8', env })
+      expect(result.status).toBe(0)
+      expect(result.stdout).toContain('usage: node scripts/jev-route.ts')
+    }
+  })
+})
+
 describe('calibrate', () => {
   const row = (route: string, answer: Answers | undefined, jevRoute = route) => ({
     role: 'ux-worker',

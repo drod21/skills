@@ -1,6 +1,7 @@
 ---
 name: verify-team-board
-description: Verify the team board's done gate, owner-thread commands, board view and scored-review completion after changing scripts/team-tasks.lib.mjs, team-tasks.mjs, team-board-view.mjs, team-review.mjs or how jev-ask/jev-decide record judgments.
+description: Verify the board's done gate, owner threads, view and scored reviews after changing team-tasks, team-board-view, team-review or how jev-ask and jev-decide record judgments.
+disable-model-invocation: true
 ---
 
 # Verify the team board

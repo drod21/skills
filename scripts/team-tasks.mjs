@@ -116,7 +116,7 @@ const USAGE = [
   '                                          lead accepts evidence when the latest check is a hold and',
   '                                          no decision but a release followed it.',
   '                                          --by must differ from the task owner',
-  '  help [<command>]                        print this usage, or one command\'s lines',
+  '  help [<command>|policy]                 print this usage, one command\'s lines, or the decision policy',
   '  show <id> [--full]                      print one task, merging the archive for a stub.',
   '                                          Raw Jev answers only with --full',
   '  decide <id> --summary <text> [--ref <path>] [--by <owner>]',
@@ -164,6 +164,10 @@ const USAGE = [
   '  doctor [--fix] [--runs]                 inspect the board and its files; --fix repairs what is provably broken;',
   '                                          --runs flags claims whose T3 wake thread ended or is gone (reads t3, 5s each)',
   '',
+  'help policy prints the decision policy.',
+].join('\n')
+
+const POLICY = [
   'Decision policy (agent guidance, not automatic enforcement):',
   '  Resolve exact facts from instructions/source/checks first. For unresolved semantic judgment:',
   '  worker -> Jev -> coordinating lead -> human only if the lead needs a user decision/authority.',
@@ -644,8 +648,9 @@ const COMMANDS = {
     if (tasks.length) console.log(tasks.map(taskLine).join('\n'))
   },
   help(file, args) {
-    if (args.length > 1) throw new Error('usage: help [<command>]')
+    if (args.length > 1) throw new Error('usage: help [<command>|policy]')
     if (!args.length) return console.log(USAGE)
+    if (args[0] === 'policy') return console.log(POLICY)
     if (!Object.hasOwn(COMMANDS, args[0])) throw new Error(`unknown command ${args[0]}. ${COMMAND_NAMES}`)
     console.log(usageFor(args[0]))
   },
