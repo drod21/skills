@@ -126,6 +126,10 @@ The project provides, and the skills assume:
 6. `TYPESAFE_API_KEY` in the environment of any process that calls Jev; without it
    the Jev scripts report an unavailable check and the process continues with lead
    judgment.
+7. Optionally `.agents/team/project-protocol.md`: the project's worker hooks,
+   guards and delivery skill, which the worker protocol and pr-delivery read.
+   Installed skill copies stay identical to the toolkit; `bin/link-skills.sh
+   --check PROJECT` lists drift and `--apply` refreshes them.
 
 Optional board app: from the toolkit root, `pnpm install` once, then `pnpm --filter @derek-skills/board build`
 and `pnpm --filter @derek-skills/board start` (or `pnpm board:dev` for Vite, port 4788). The default Nitro
