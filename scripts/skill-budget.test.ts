@@ -11,6 +11,7 @@ const CEILINGS: Record<string, number> = {
   'team-coordinator/references/worker-protocol.md': 5_000,
 }
 const SKILL_CEILING = 10_000
+const BRIEF_CEILING = 1_500
 const DESCRIPTION_CEILING = 200
 
 function markdownFiles(dir: string): string[] {
@@ -51,6 +52,14 @@ describe('skill budget', () => {
     const over = Object.entries(CEILINGS)
       .map(([file, max]) => ({ file, bytes: statSync(join(skills, file)).size, max }))
       .filter(({ bytes, max }) => bytes > max)
+    expect(over).toEqual([])
+  })
+
+  it('keeps every brief template under the brief ceiling', () => {
+    const briefs = join(skills, 'team-coordinator/references/briefs')
+    const over = readdirSync(briefs)
+      .map((name) => ({ file: name, bytes: statSync(join(briefs, name)).size }))
+      .filter(({ bytes }) => bytes > BRIEF_CEILING)
     expect(over).toEqual([])
   })
 
