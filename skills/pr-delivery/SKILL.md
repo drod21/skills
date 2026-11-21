@@ -9,7 +9,7 @@ user-invocable: false
 Project-agnostic delivery checklist. A repository adds its own gates (pre-push
 hooks, required checks, deploy rules) in its `AGENTS.md` or command skill; those
 win over this page. When the project checkout has `.agents/team/project-protocol.md`,
-load the delivery skill it names too.
+load the delivery skill it names too; it adds gates and never removes one here.
 
 ## Before handing off
 

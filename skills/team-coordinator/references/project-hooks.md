@@ -1,7 +1,7 @@
 # Project hooks: examples
 
-Workers do not read this file. A project copies the hooks it uses into its own
-protocol or role skills; these are examples of what such hooks look like.
+Examples of hooks a project puts in its `.agents/team/project-protocol.md`,
+which workers read after the worker protocol.
 
 - **Spec preflight.** Test workers write end-to-end specs before the build and
   cannot run them. Before a lane asks for a device or browser slot, a reviewer

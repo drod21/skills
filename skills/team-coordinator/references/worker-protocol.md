@@ -13,8 +13,8 @@ brief names and cite them in the handoff. Product evidence follows the
    never a heredoc, `tee` or redirect. Branch a new unit from the verified remote
    default branch and report if it is behind; a builder continues from its test
    commit, including any lead-approved amendment. Carry another packet's commits
-   only when the brief names it. An existing unit branch may be fetched and merged
-   before a push. Commit and push at each green step.
+   only when the brief names it. On an existing unit branch, fetch and merge that
+   branch before a push. Commit and push at each green step.
 2. **Claim.** `node "$TOOLKIT/scripts/team-tasks.mjs" claim <role> <owner> --id
    <id> --run <kind>:<ref> [--wake <threadId>]`, kind `workflow`, `t3_task`,
    `subagent` or `session`. If the lead already claimed for your owner, verify
@@ -49,7 +49,7 @@ brief names and cite them in the handoff. Product evidence follows the
    with `uptime`, never override it.
 5. **Hand off.** Task and owner, checkout and head, changed files, outcome, checks
    with actual results, evidence paths, blockers. From a worktree, give a commit
-   or patch; it does not verify the integrated parent. A diagnosis states
+   or patch; a child's success does not verify the integrated parent. A diagnosis states
    "reproduced with the owner's inputs: yes/no"; "by design" or "not built yet"
    goes to the owner only with yes. When logic returns the action and the screen
    does not show it, check screen wiring and data-ready timing first.
@@ -69,4 +69,4 @@ brief names and cite them in the handoff. Product evidence follows the
 
 If the project checkout has `.agents/team/project-protocol.md`, read it after
 this file: the project's hooks, guards and delivery skill
-([examples](project-hooks.md)).
+([examples](project-hooks.md)). It adds rules and never relaxes one here.
