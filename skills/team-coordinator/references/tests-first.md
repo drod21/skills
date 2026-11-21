@@ -31,7 +31,14 @@ fixing tests after the build.
    decisions; a mismatch goes back to the test worker as an amendment before the
    builder is released. Then record the baseline with `decide <test id> --summary
    <SHA and red result> --by <lead>`, release the builder with `after <build id>
-   none`, then dispatch. Close the test task with the builder's green run. The
+   none`, then dispatch. Close the test task after the builder's green run, but
+   on its own red run: the evidence check counts a passing test against a
+   test-writing task, so the green run never goes in as acceptance evidence or
+   in the summary. Attach it with `evidence <test id> --supporting <item>`,
+   which the check does not read. The test worker then runs `jev-ask.ts
+   --check-evidence --task <test id> --by <owner> --summary <red result at the
+   lock commit> --phase "red run" --current-evidence <retained red-run path>`
+   and `done`. The
    build brief names the test commit, the locked files, the run command and the
    line `Older tests changed: <list> | none (<command>)`, and says: make these pass; do not edit, skip, delete, loosen or re-time a locked
    file. A builder may add tests in new files. A builder who believes a locked
