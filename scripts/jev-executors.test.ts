@@ -45,10 +45,10 @@ describe('executor registry', () => {
   it('defaults every tier to the executor the coordinator skill mapped before', () => {
     const defaults = Object.fromEntries(TIER_ROUTES.map((route) => [route, TIER_EXECUTORS[route][0]?.id]))
     expect(defaults).toEqual({
-      haiku_fork: 'claudeAgent:claude-haiku-5-5',
+      haiku_fork: 'claudeAgent_2:claude-haiku-5-5',
       luna_patch: 'codex:gpt-6-luna',
       grok_patch: 'cursor:grok-4.7',
-      sonnet_patch: 'claudeAgent:claude-sonnet-5-5',
+      sonnet_patch: 'claudeAgent_2:claude-sonnet-5-5',
       terra_patch: 'codex:gpt-6.1-terra',
     })
   })
@@ -91,9 +91,9 @@ describe('availability', () => {
   })
 
   it('keeps only offered pairs, in registry order', () => {
-    const available = parseAvailable(['opencode:opencode/kimi-k3', 'claudeAgent:claude-sonnet-5-5'])
+    const available = parseAvailable(['opencode:opencode/kimi-k3', 'claudeAgent_2:claude-sonnet-5-5'])
     expect(ids(availableFor('sonnet_patch', { available }))).toEqual([
-      'claudeAgent:claude-sonnet-5-5',
+      'claudeAgent_2:claude-sonnet-5-5',
       'opencode:opencode/kimi-k3',
     ])
     expect(availableFor('haiku_fork', { available })).toEqual([])
@@ -108,7 +108,7 @@ describe('availability', () => {
     expect(ids(oneModel)).not.toContain('opencode:opencode/kimi-k3')
     expect(ids(oneModel)).toContain('opencode:console-xai/grok-4.7')
     const noOpencode = availableFor('sonnet_patch', { unavailable: ['opencode', 'cursor'] })
-    expect(ids(noOpencode)).toEqual(['claudeAgent:claude-sonnet-5-5'])
+    expect(ids(noOpencode)).toEqual(['claudeAgent_2:claude-sonnet-5-5'])
   })
 
   it('applies --unavailable on top of --available', () => {
@@ -120,13 +120,13 @@ describe('availability', () => {
     const parsed = parseAvailable([
       'codex: gpt-6-luna',
       { providerInstanceId: 'cursor', model: 'grok-4.7' },
-      { providerInstanceId: 'claudeAgent', canRun: true, models: [{ id: 'claude-haiku-5-5' }, 'claude-opus-5-5'] },
+      { providerInstanceId: 'claudeAgent_2', canRun: true, models: [{ id: 'claude-haiku-5-5' }, 'claude-opus-5-5'] },
       { providerInstanceId: 'fx', canRun: false, models: [{ id: 'default' }] },
       { providerInstanceId: 'grok', model: 'grok-4.7', canRun: 'false', extra: true },
     ])
     expect([...parsed].sort()).toEqual([
-      'claudeAgent:claude-haiku-5-5',
-      'claudeAgent:claude-opus-5-5',
+      'claudeAgent_2:claude-haiku-5-5',
+      'claudeAgent_2:claude-opus-5-5',
       'codex:gpt-6-luna',
     ])
     expect(
@@ -176,7 +176,7 @@ describe('pickExecutor', () => {
   it('falls back to the tier default below the floor', () => {
     const picked = pickExecutor('sonnet_patch', offered, answer('opencode:opencode/kimi-k3', 0.3), MIN)
     expect(picked.source).toBe('default')
-    expect(picked.executor?.id).toBe('claudeAgent:claude-sonnet-5-5')
+    expect(picked.executor?.id).toBe('claudeAgent_2:claude-sonnet-5-5')
     expect(picked.reasons.join(' ')).toMatch(/below floor/)
   })
 
@@ -184,18 +184,18 @@ describe('pickExecutor', () => {
     const narrowed = offered.filter((entry) => entry.id !== 'opencode:opencode/kimi-k3')
     const wide = pickExecutor('sonnet_patch', narrowed, answer('opencode:opencode/kimi-k3'), MIN)
     expect(wide.source).toBe('default')
-    expect(wide.executor?.id).toBe('claudeAgent:claude-sonnet-5-5')
+    expect(wide.executor?.id).toBe('claudeAgent_2:claude-sonnet-5-5')
     expect(wide.reasons.join(' ')).toMatch(/not offered/)
     // An id from another tier is not offered either.
     expect(pickExecutor('sonnet_patch', offered, answer('codex:gpt-6.1-terra'), MIN).source).toBe('default')
   })
 
   it('takes the first available executor when the tier default is out', () => {
-    const rest = offered.filter((entry) => entry.providerInstanceId !== 'claudeAgent')
+    const rest = offered.filter((entry) => entry.providerInstanceId !== 'claudeAgent_2')
     const picked = pickExecutor('sonnet_patch', rest, null, MIN)
     expect(picked.executor?.id).toBe(rest[0]?.id)
     expect(picked.source).toBe('default')
-    expect(picked.reasons.join(' ')).toMatch(/tier default claudeAgent:claude-sonnet-5-5 is unavailable/)
+    expect(picked.reasons.join(' ')).toMatch(/tier default claudeAgent_2:claude-sonnet-5-5 is unavailable/)
   })
 
   it('needs no answer for a single available executor', () => {
@@ -253,7 +253,7 @@ describe('askExecutor', () => {
     expect(request.state.task).toEqual({ title: task.title, role: task.role, brief: task.brief })
     expect(request.state.tier.purpose).toMatch(/Several packages/)
     const json = JSON.stringify(request)
-    expect(json).toContain('claudeAgent:claude-sonnet-5-5')
+    expect(json).toContain('claudeAgent_2:claude-sonnet-5-5')
     expect(json).not.toContain('mistral-large-4')
     expect(json).toMatch(/\$3 in \/ \$15 out per million tokens/)
   })
@@ -368,7 +368,7 @@ describe('executor in routed verdicts', () => {
   it('uses the tier default on a low-confidence pick', async () => {
     const { client } = clientFor(full(), { choice: 'opencode:opencode/kimi-k3', confidence: 0.2 })
     const [result] = await routeTasks(sample, client, quiet)
-    expect(result!.verdict.executor).toMatchObject({ id: 'claudeAgent:claude-sonnet-5-5', source: 'default' })
+    expect(result!.verdict.executor).toMatchObject({ id: 'claudeAgent_2:claude-sonnet-5-5', source: 'default' })
   })
 
   it('never emits or stores untrusted choice text or probability keys', async () => {
@@ -391,15 +391,15 @@ describe('executor in routed verdicts', () => {
   })
 
   it('honors --unavailable and --available before asking', async () => {
-    const { client } = clientFor(full(), { choice: 'claudeAgent:claude-sonnet-5-5', confidence: 0.99 })
-    const [out] = await routeTasks(sample, client, { ...quiet, availability: { unavailable: ['claudeAgent'] } })
+    const { client } = clientFor(full(), { choice: 'claudeAgent_2:claude-sonnet-5-5', confidence: 0.99 })
+    const [out] = await routeTasks(sample, client, { ...quiet, availability: { unavailable: ['claudeAgent_2'] } })
     // Jev named an executor that was filtered out, so the first available one stands.
     expect(out!.verdict.executor).toMatchObject({ id: 'cursor:kimi-k3', source: 'default' })
-    const available = parseAvailable(['claudeAgent:claude-sonnet-5-5'])
+    const available = parseAvailable(['claudeAgent_2:claude-sonnet-5-5'])
     const only = clientFor(full(), { choice: 'x', confidence: 1 })
     const [single] = await routeTasks(sample, only.client, { ...quiet, availability: { available } })
     expect(only.calls()).toBe(1)
-    expect(single!.verdict.executor).toMatchObject({ id: 'claudeAgent:claude-sonnet-5-5', source: 'default' })
+    expect(single!.verdict.executor).toMatchObject({ id: 'claudeAgent_2:claude-sonnet-5-5', source: 'default' })
     const empty = clientFor(full(), { choice: 'x', confidence: 1 })
     const [none] = await routeTasks(sample, empty.client, {
       ...quiet,

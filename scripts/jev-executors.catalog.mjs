@@ -18,9 +18,10 @@ function row(providerInstanceId, model, family, cost, options = {}) {
 
 const OC = 'opencode'
 
-const CLAUDE_HAIKU = row('claudeAgent', 'claude-haiku-5-5', 'Claude', [0.1, 0.5], { effort: 'medium' })
-const CLAUDE_SONNET = row('claudeAgent', 'claude-sonnet-5-5', 'Claude', [2, 10], { effort: 'high' })
-const CLAUDE_OPUS = row('claudeAgent', 'claude-opus-5-5', 'Claude', [4, 20], { effort: 'high' })
+// The `claudeAgent` instance is disabled in the harness; `claudeAgent_2` runs Claude children.
+const CLAUDE_HAIKU = row('claudeAgent_2', 'claude-haiku-5-5', 'Claude', [0.1, 0.5], { effort: 'medium' })
+const CLAUDE_SONNET = row('claudeAgent_2', 'claude-sonnet-5-5', 'Claude', [2, 10], { effort: 'high' })
+const CLAUDE_OPUS = row('claudeAgent_2', 'claude-opus-5-5', 'Claude', [4, 20], { effort: 'high' })
 const CODEX_LUNA = row('codex', 'gpt-6-luna', 'GPT', [0.1, 0.5], { reasoningEffort: 'medium' })
 // Terra at its default effort (low) quits after setup, so the tier default asks for high.
 const CODEX_TERRA = row('codex', 'gpt-6.1-terra', 'GPT', [1, 5], { reasoningEffort: 'high' })
