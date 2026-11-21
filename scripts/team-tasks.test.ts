@@ -424,6 +424,19 @@ describe('brief', () => {
     expect(cli('brief', '3', '--kind', 'build').stdout).toContain('executor none: the verdict offered none')
   })
 
+  it('tells the lead how to pick an executor for a re-route to a route with no catalog tier', () => {
+    seed(task(1, { route: 'claude_review', jev: routed }), task(2, { route: 'terra_patch', jev: { ...routed, route: 'needs_lead', executor: null } }))
+    const untiered = cli('brief', '1', '--kind', 'review').stdout
+    expect(untiered).toContain('claude_review has no tier in jev-executors.catalog.mjs')
+    expect(untiered).toContain('pick one runnable catalog pair and record it in this brief')
+    expect(untiered).not.toContain('first available claude_review entry')
+    seed(task(1, { route: 'claude_review' }), task(2, { route: 'sol_patch', jev: { ...routed, route: 'sol_patch', executor: null } }), task(3, { route: 'terra_patch', jev: { ...routed, route: 'needs_lead', executor: null } }))
+    for (const id of ['1', '2']) expect(cli('brief', id, '--kind', 'build').stdout).toContain('has no tier in jev-executors.catalog.mjs; pick one runnable catalog pair')
+    const fromHold = cli('brief', '3', '--kind', 'build').stdout
+    expect(fromHold).toContain('the verdict held this task')
+    expect(fromHold).toContain('first available terra_patch entry')
+  })
+
   it('puts the scoring instructions and the fix threshold in a review brief', () => {
     seed(task(1, { role: 'qa-worker' }))
     const result = cli('brief', '1', '--kind', 'review')
