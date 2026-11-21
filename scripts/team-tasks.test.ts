@@ -361,7 +361,7 @@ describe('compact reads', () => {
     for (const flag of ['--help', '-h']) {
       const result = cli(flag)
       expect(result.status).toBe(0)
-      expect(result.stdout).toContain('Decision policy')
+      expect(result.stdout).toContain('list [--all]')
     }
   })
 
@@ -378,7 +378,10 @@ describe('compact reads', () => {
     expect(evidence.status).toBe(0)
     expect(evidence.stdout).toContain('evidence <id> [--supporting] <item...>')
     expect(evidence.stdout).not.toContain('decide <id>')
-    expect(cli('help').stdout).toContain('Decision policy')
+    expect(cli('help').stdout).not.toContain('Decision policy')
+    expect(cli('help').stdout).toContain('help policy')
+    expect(cli('help', 'policy').stdout).toContain('Decision policy')
+    expect(cli('help', 'policy').stdout).toContain('worker -> Jev')
     expect(cli('help', 'bogus').status).toBe(1)
   })
 })
