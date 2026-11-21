@@ -117,6 +117,8 @@ const USAGE = [
   '                                          no decision but a release followed it.',
   '                                          --by must differ from the task owner',
   '  help [<command>|policy]                 print this usage, one command\'s lines, or the decision policy',
+  '  brief <id> --kind <test|build|review|verify>  print a delegate brief with the board fields filled;',
+  '                                          the lead fills the <slots>. Read-only',
   '  show <id> [--full]                      print one task, merging the archive for a stub.',
   '                                          Raw Jev answers only with --full',
   '  decide <id> --summary <text> [--ref <path>] [--by <owner>]',
@@ -263,6 +265,7 @@ const FLAGS = {
   route: ['--reason', '--by'],
   after: [],
   list: ['--all', '--status', '--role', '--tag', '--json'],
+  brief: ['--kind'],
   help: [],
   view: ['--role', '--tag', '--owner', '--closed-limit', '--closed-before'],
   moves: ['--by'],
@@ -647,6 +650,13 @@ const COMMANDS = {
     if (json) return out(tasks)
     if (tasks.length) console.log(tasks.map(taskLine).join('\n'))
   },
+  brief(file, args) {
+    const kind = takeFlag(args, '--kind')
+    if (!BRIEF_KINDS.includes(kind) || args.length !== 1) throw new Error(BRIEF_USAGE)
+    const id = requireId(args)
+    const template = readFileSync(join(import.meta.dirname, '..', 'skills/team-coordinator/references/briefs', `${kind}.md`), 'utf8')
+    console.log(fillBrief(template, showTask(file, id)).trimEnd())
+  },
   help(file, args) {
     if (args.length > 1) throw new Error('usage: help [<command>|policy]')
     if (!args.length) return console.log(USAGE)
@@ -748,6 +758,33 @@ run team-tasks.mjs help <command> for one command's usage, or help for all of it
 const CONTROL_OR_SPACE = /[\x00-\x1f\x7f\s]+/g
 const column = (value) => (value == null || value === '' ? '-' : String(value).replace(CONTROL_OR_SPACE, '_'))
 const flatText = (value) => String(value ?? '').replace(CONTROL_OR_SPACE, ' ').trim()
+
+const BRIEF_KINDS = ['test', 'build', 'review', 'verify']
+const BRIEF_USAGE = 'usage: brief <id> --kind <test|build|review|verify>'
+
+function executorText(task) {
+  const executor = task.jev?.executor
+  if (!executor) return `none yet (run jev-route.ts --task ${task.id} --available <file>)`
+  const options = executor.options && Object.keys(executor.options).length ? ` ${JSON.stringify(executor.options)}` : ''
+  return `${executor.providerInstanceId}:${executor.model}${options}`
+}
+
+// Board fields fill {{slots}}; <slots> stay for the lead.
+function fillBrief(template, task) {
+  const values = {
+    id: String(task.id),
+    title: flatText(task.title),
+    role: column(task.role),
+    tag: column(task.tag),
+    after: task.after?.length ? task.after.join(',') : 'none',
+    route: column(task.route ?? task.jev?.route),
+    executor: executorText(task),
+    accept: task.accept ? flatText(task.accept) : 'none on the board',
+    board: boardScriptPath(),
+    toolkit: join(import.meta.dirname, '..'),
+  }
+  return template.replace(/\{\{(\w+)\}\}/g, (slot, name) => (Object.hasOwn(values, name) ? values[name] : slot))
+}
 
 function taskLine(task) {
   const after = task.after?.length ? ` after=${task.after.join(',')}` : ''

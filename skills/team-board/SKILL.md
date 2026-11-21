@@ -50,8 +50,9 @@ agent ID. A team or project name is a `--tag`, never a role.
 
 `team-tasks.mjs --help` is the authoritative list; the script wins over this page.
 
-Read-only: `list [--all] [--status s] [--role r] [--tag t]` (open and claimed by
-default; `--all` expands the archive), `show <id>`, `inbox`, `review-report <id>`,
+Read-only: `list [--all] [--status s] [--role r] [--tag t] [--json]` (one line per
+open or claimed task; `--all` expands the archive, `--json` prints full tasks),
+`show <id> [--full]`, `brief <id> --kind <test|build|review|verify>`, `help policy`, `inbox`, `review-report <id>`,
 `view` (the whole board as a kanban renders it), `moves <id>` (per target status,
 the command and inputs needed, or the board's refusal), `stale [--hours 24]
 [--runs]`, `doctor [--runs]`. The first mutating command creates an absent board.

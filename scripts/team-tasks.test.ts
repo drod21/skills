@@ -386,6 +386,54 @@ describe('compact reads', () => {
   })
 })
 
+describe('brief', () => {
+  const executor = { id: 'codex:model-x', providerInstanceId: 'codex', model: 'model-x', options: { effort: 'high' }, source: 'jev' }
+  const routed = { route: 'terra_patch', jevRoute: 'terra_patch', confidence: 0.9, holds: [], roleFits: true, suggestedRole: null, check: null, reasons: [], executor }
+
+  it('fills a build brief from the board and leaves the lead slots open', () => {
+    seed(task(1), task(2, { title: 'Add the export button', accept: 'export.test.ts passes', after: [1], tag: 'exports', route: 'terra_patch', jev: routed }))
+    const before = readFileSync(board, 'utf8')
+    const result = cli('brief', '2', '--kind', 'build')
+    expect(result.status, result.stderr).toBe(0)
+    for (const text of [
+      '#2 Add the export button',
+      'export.test.ts passes',
+      'terra_patch',
+      'codex:model-x',
+      'after 1',
+      `node ${CLI} claim ux-worker <owner> --id 2`,
+      'Guards:',
+      'Older tests changed by this rule:',
+      '<allowed files>',
+    ])
+      expect(result.stdout).toContain(text)
+    expect(result.stdout).not.toMatch(/\{\{\w+\}\}/)
+    expect(readFileSync(board, 'utf8')).toBe(before)
+  })
+
+  it('puts the scoring instructions and the fix threshold in a review brief', () => {
+    seed(task(1, { role: 'qa-worker' }))
+    const result = cli('brief', '1', '--kind', 'review')
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout).toContain('frequency x impact >= 20')
+    expect(result.stdout).toContain('frequency 0')
+    expect(result.stdout).toContain('jev-ask.ts')
+  })
+
+  it('prints test and verify briefs', () => {
+    seed(task(1))
+    expect(cli('brief', '1', '--kind', 'test').stdout).toContain('red run')
+    expect(cli('brief', '1', '--kind', 'verify').stdout).toContain('never ask the owner')
+  })
+
+  it('refuses a missing or unknown kind and a missing task', () => {
+    seed(task(1))
+    expect(cli('brief', '1').stderr).toContain('usage: brief <id> --kind <test|build|review|verify>')
+    expect(cli('brief', '1', '--kind', 'deploy').stderr).toContain('usage: brief')
+    expect(cli('brief', '9', '--kind', 'build').status).toBe(1)
+  })
+})
+
 describe('healing', () => {
   it('keeps a backup that matches the last board it wrote', () => {
     seed(task(1))
