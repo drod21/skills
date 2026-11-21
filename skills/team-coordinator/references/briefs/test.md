@@ -12,6 +12,7 @@ Write the failing tests and only the contract they need to compile; never the
 implementation. Branch from `origin/main` and commit them as the unit's first commit.
 
 - Acceptance cases, each citing its decision: <input, expected result, level>.
+- Expected failure: <each test fails because ...>.
 - Numbered decisions: <quoted owner and lead decisions>.
 - Before the lock, run the existing tests for the affected source. Amend or
   remove, in the lock commit, each older test that asserts the opposite of a
