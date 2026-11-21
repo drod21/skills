@@ -36,7 +36,7 @@ Scope: agent coordination and human product review.
 ## Default: tests before builders
 
 Scope: every unit dispatched to a builder. Procedure: [tests
-first](../SKILL.md#tests-first).
+first](tests-first.md).
 
 - The lead's plan carries the acceptance cases; a lightweight worker turns them
   into failing tests before the build task starts.

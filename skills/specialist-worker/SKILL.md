@@ -1,6 +1,7 @@
 ---
 name: specialist-worker
-description: Handle specialist-worker tasks in a domain the project defines (for example signal processing, ML evaluation, billing rules, domain science). Use as the template for a project's own specialist role skills.
+description: Handle specialist-worker tasks in a domain the project defines, such as signal processing, ML evaluation or billing rules. Template for a project's own specialist role skills.
+disable-model-invocation: true
 ---
 
 # Specialist worker

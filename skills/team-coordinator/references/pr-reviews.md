@@ -8,9 +8,57 @@ area lead; the chief of staff queues only decisions the human must make.
 Use this workflow for PR reviewers and adversaries in Claude Code, Codex, Cursor
 or any harness with delegation. The coordinator owns the plan and integration;
 independent reviewers and helpers return evidence. Roles are portable
-instructions, not fixed model names. Keep the scoring, Jev cross-check, fix
-threshold and deferred-finding rules in the coordinator's
-[review instructions](../SKILL.md#review-instructions).
+instructions, not fixed model names. The scoring, Jev cross-check, fix threshold and
+deferred-finding rules are the [review instructions](#review-instructions) below.
+
+## Review instructions
+
+Nothing is held up in review: the reviewer already has the diff loaded, so the
+reviewer fixes what it finds. A review ends with the fixes committed and pushed
+and a PASS at the head the reviewer pushed, not a list of findings for someone
+else. A review may end without a PASS only for something the reviewer cannot
+settle in the diff: an owner decision, a missing credential or approval, or a
+change outside the pull request's scope. It then fixes everything else first and
+names that one item. Never write a read-only review brief.
+
+Reviewers and adversaries review the pinned diff and directly fix qualifying
+issues within their assigned file ownership. Do not assign them test execution,
+including after their fixes or on re-checks. They may inspect test source and add
+tests in new files; locked tests change only through a test worker, and their
+first check is the tests-first gate. Assign test execution to a separate test
+worker or CI, in parallel with adversaries when safe or after review and before
+merge. The coordinator ensures required checks cover the final integrated
+revision (earlier results do not validate later edits); a designated fixer owns
+test and CI failures and integration conflicts. Give parallel adversaries
+disjoint writable files or isolated checkouts with an integration owner.
+
+The sections below cover worktree setup, call-site and test helpers, advisor
+checkpoints and the review/fix boundary, on every re-check. Create every review board task with `add ... --review`:
+the board then requires a scored review (`{ "findings": [] }` for a clean one),
+refuses completion over pending or blocked findings, and records the report.
+Submit with `review <id> <findings.json> --by <claim-owner>` and read unfixed
+findings with `review-report <id>` ([execution tools](jev-execution.md)).
+
+Include these three instructions in every reviewer brief, re-checks too:
+
+1. **Score every comment.** State the concrete conditions under which the issue
+   occurs, occurrence frequency 0-10 and impact 1-10, with evidence and a
+   rationale for both. If occurrence conditions cannot be specified, assign
+   **frequency 0**; never invent a scenario or inflate frequency to justify a fix.
+2. **Cross-check with Jev.** Verify factual claims against source and observed
+   behavior, then use `jev-ask.ts` for a bounded judgment or `jev-decide.ts` for
+   fix options. Include the conditions, scores, rationale and non-secret
+   evidence. Retain the input and result or unavailability evidence and resolve
+   disagreements through the escalation chain. Jev does not replace the
+   reviewer's scores, factual checks or the fix threshold.
+3. **Apply the fix threshold and report everything deferred.** Fix an issue only
+   when **frequency x impact >= 20**, or **frequency >= 1 and impact >= 8**.
+   Leave every other issue unfixed, including frequency-0 comments, on every
+   round: repeatedly fixing unlikely issues prevents convergence. In the
+   completion report list every unfixed comment with its conditions (or
+   explicitly unspecified), frequency, impact, product, Jev cross-check result
+   or unavailability, and why it remains unfixed. State when there are none;
+   report any qualifying issue that stays blocked separately with owner and blocker.
 
 ## Pin and isolate
 

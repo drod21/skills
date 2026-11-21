@@ -1,6 +1,7 @@
 ---
 name: backend-worker
 description: Handle backend-worker tasks for server APIs, persistence and shared contracts, with scoped edits and integration evidence. Route specialist-domain decisions to their specialists.
+disable-model-invocation: true
 ---
 
 # Backend worker

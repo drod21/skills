@@ -1,6 +1,6 @@
 ---
 name: jev
-description: Use the Jev judgment scripts (jev-route, jev-decide, jev-ask, jev-batch, jev-select, jev-ui) to route tasks, score fix options and answer bounded yes/no, pick and evidence questions with calibrated probabilities. Load before calling any jev-*.ts script or recording a Jev judgment.
+description: Run the Jev judgment scripts (jev-route, jev-decide, jev-ask, jev-batch, jev-select, jev-ui) for routing, option scoring and bounded questions. Load before any jev-*.ts call or Jev record.
 ---
 
 # Jev scripts
