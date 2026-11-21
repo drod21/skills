@@ -16,6 +16,7 @@ ports and devices <lane ports, device slot>.
 - Recover setup hurdles inside these allowed fixes: <list>; never ask the owner
   and never request a secret.
 - Rerun a timeout-type failure once, with no timeout bump. Run specs in the
-  foreground one at a time and post each pass or fail before the next.
+  foreground one at a time and post each pass or fail before the next. Never end
+  the turn while a run is live or still owed.
 
 Return the build identity, each result and the retained evidence paths.

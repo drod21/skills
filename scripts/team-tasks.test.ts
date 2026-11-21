@@ -403,12 +403,25 @@ describe('brief', () => {
       'after 1',
       `node ${CLI} claim ux-worker <owner> --id 2`,
       'Guards:',
-      'Older tests changed by this rule:',
+      'Older tests changed:',
       '<allowed files>',
     ])
       expect(result.stdout).toContain(text)
     expect(result.stdout).not.toMatch(/\{\{\w+\}\}/)
     expect(readFileSync(board, 'utf8')).toBe(before)
+  })
+
+  it('names no executor once a lead re-routes or holds the task, and says the verdict had none', () => {
+    seed(
+      task(1, { route: 'sonnet_patch', jev: routed }),
+      task(2, { route: 'needs_lead', jev: { ...routed, route: 'needs_lead' } }),
+      task(3, { route: 'terra_patch', jev: { ...routed, executor: null } }),
+    )
+    const rerouted = cli('brief', '1', '--kind', 'build').stdout
+    expect(rerouted).not.toContain('codex:model-x')
+    expect(rerouted).toContain('jev-executors.catalog.mjs')
+    expect(cli('brief', '2', '--kind', 'build').stdout).toContain('executor none: the route is held')
+    expect(cli('brief', '3', '--kind', 'build').stdout).toContain('executor none: the verdict offered none')
   })
 
   it('puts the scoring instructions and the fix threshold in a review brief', () => {

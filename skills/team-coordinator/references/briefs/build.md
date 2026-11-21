@@ -12,7 +12,8 @@ Make the locked tests pass. Never edit, skip, delete, loosen or re-time a locked
 file; add tests only in new files.
 
 - Test commit: <sha>. Locked files: <list>. Run: <command>.
-- Older tests changed by this rule: <list> | none (<command>).
+- Older tests changed: <list> | none (<command>).
+- Expected evidence: <green run, captures>.
 - A locked test that looks wrong: stop that part, report the test, reason and
   evidence to the lead, and carry on with the rest.
 - Branch from the test commit; carry other packets' commits only for: <named dependencies | none>.
