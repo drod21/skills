@@ -12,6 +12,8 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 
+import { TIER_EXECUTORS } from './jev-executors.catalog.mjs'
+
 import {
   abandonStaleEvidenceCheck,
   acceptEvidence,
@@ -767,8 +769,12 @@ function executorText(task) {
   if (route === 'needs_lead') return 'none: the route is held for the lead'
   if (route === 'lead_workflow') return 'none: lead_workflow runs as a lead workflow'
   if (!task.jev) return `none yet (run jev-route.ts --task ${task.id} --available <file>)`
-  if (task.jev.route !== route)
-    return `none for ${route}: the verdict's executor is for ${task.jev.route}; take the first available ${route} entry in jev-executors.catalog.mjs and record it`
+  if (task.jev.route !== route) {
+    const was = task.jev.route === 'needs_lead' ? 'the verdict held this task' : `the verdict's executor is for ${column(task.jev.route)}`
+    if (!Object.hasOwn(TIER_EXECUTORS, route))
+      return `none for ${column(route)}: ${was}, and ${column(route)} has no tier in jev-executors.catalog.mjs; pick one runnable catalog pair and record it in this brief`
+    return `none for ${route}: ${was}; take the first available ${route} entry in jev-executors.catalog.mjs and record the choice in this brief`
+  }
   const executor = task.jev.executor
   if (!executor) return 'none: the verdict offered none for this route'
   const options = executor.options && Object.keys(executor.options).length ? ` ${JSON.stringify(executor.options)}` : ''
