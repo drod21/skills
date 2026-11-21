@@ -69,3 +69,24 @@ it('keeps copies usable when Claude shares the entire agents skills directory', 
   install('--apply')
   expect(readFileSync(join(project, '.claude/skills/ux-worker/SKILL.md'), 'utf8')).toBe(readFileSync(join(toolkit, 'skills/ux-worker/SKILL.md'), 'utf8'))
 })
+
+function check() {
+  return spawnSync('bash', [join(toolkit, 'bin/link-skills.sh'), '--check', project], { encoding: 'utf8' })
+}
+
+it('--check passes on fresh copies and names each drifted, extra or missing file without writing', () => {
+  install('--apply')
+  const clean = check()
+  expect(clean.status, clean.stdout + clean.stderr).toBe(0)
+  const skill = join(project, '.agents/skills/ux-worker')
+  writeFileSync(join(skill, 'SKILL.md'), 'edited copy')
+  writeFileSync(join(skill, 'extra.md'), 'extra')
+  rmSync(join(project, '.agents/skills/qa-worker'), { recursive: true })
+  const drifted = check()
+  expect(drifted.status).toBe(1)
+  expect(drifted.stdout).toContain('ux-worker/SKILL.md')
+  expect(drifted.stdout).toContain('ux-worker/extra.md')
+  expect(drifted.stdout).toContain('qa-worker')
+  expect(readFileSync(join(skill, 'SKILL.md'), 'utf8')).toBe('edited copy')
+  expect(existsSync(join(project, '.agents/skills/qa-worker'))).toBe(false)
+})

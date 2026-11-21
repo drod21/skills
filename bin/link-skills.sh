@@ -5,21 +5,25 @@
 #   <project>/.claude/skills/X   -> ../../.agents/skills/X   (relative symlink)
 # With --apply, replaces same-named skills and Claude links, including stale files.
 # Unrelated skill names and external symlink targets are preserved.
-#   bin/link-skills.sh [--apply] [--install-pstack] PROJECT_DIR
+#   bin/link-skills.sh [--apply | --check] [--install-pstack] PROJECT_DIR
+# --check writes nothing: it lists each installed file that differs from the
+# toolkit, is missing, or is extra, and exits 1 when there is any.
 # chief-of-staff ships in this toolkit and is refreshed on apply. pstack is
 # third-party (a Claude Code plugin); --install-pstack --apply installs it only if absent.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 apply=0
+check=0
 install_pstack=0
 project_dir=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --apply) apply=1 ;;
+    --check) check=1 ;;
     --install-pstack) install_pstack=1 ;;
-    -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
     -*) echo "unknown argument: $1" >&2; exit 2 ;;
     *)
       if [ -n "$project_dir" ]; then
@@ -33,7 +37,11 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$project_dir" ]; then
-  echo "usage: bin/link-skills.sh [--apply] [--install-pstack] PROJECT_DIR" >&2
+  echo "usage: bin/link-skills.sh [--apply | --check] [--install-pstack] PROJECT_DIR" >&2
+  exit 2
+fi
+if [ "$apply" = 1 ] && [ "$check" = 1 ]; then
+  echo "--apply and --check cannot be used together" >&2
   exit 2
 fi
 
@@ -84,6 +92,40 @@ link_claude() { # relative_src dest
     echo "would    replace $dest with link -> $src"
   fi
 }
+
+files_in() { # dir: every file below it, relative, sorted
+  (cd "$1" && find . -type f ! -name .DS_Store | sed 's|^\./||' | LC_ALL=C sort)
+}
+
+if [ "$check" = 1 ]; then
+  drift=0
+  for dir in "$root"/skills/*/; do
+    src="${dir%/}"
+    dest="$agents_skills/$(basename "$dir")"
+    if [ ! -d "$dest" ]; then
+      echo "missing  $dest"
+      drift=1
+      continue
+    fi
+    while IFS= read -r rel; do
+      if [ ! -f "$dest/$rel" ]; then
+        echo "missing  $dest/$rel"
+        drift=1
+      elif ! cmp -s "$src/$rel" "$dest/$rel"; then
+        echo "drift    $dest/$rel"
+        drift=1
+      fi
+    done < <(files_in "$src")
+    while IFS= read -r rel; do
+      if [ ! -e "$src/$rel" ]; then
+        echo "extra    $dest/$rel"
+        drift=1
+      fi
+    done < <(files_in "$dest")
+  done
+  [ "$drift" = 1 ] || echo "ok       every installed skill matches the toolkit"
+  exit "$drift"
+fi
 
 for dir in "$root"/skills/*/; do
   name="$(basename "$dir")"

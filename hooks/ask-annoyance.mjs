@@ -18,7 +18,7 @@ export function decide(input, { stateDir, markAsked }) {
     decision: 'block',
     reason:
       `Before you finish, answer one question: ${QUESTION} ` +
-      `If yes, run exactly once: limen complain --session ${session} "<one sentence naming what annoyed you>". ` +
+      `If yes, run exactly once: limen complain --session ${session} "<skill or script>: expected <what you expected>, got <what happened>". ` +
       'If no, run nothing and write nothing. Either way, then finish as you were going to; do not mention this question in your reply.',
   }
 }

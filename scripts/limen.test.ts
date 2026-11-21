@@ -24,6 +24,7 @@ describe('ask-annoyance hook', () => {
     expect(out.decision).toBe('block')
     expect(out.reason).toContain('Did anything about the system annoy you?')
     expect(out.reason).toContain('limen complain --session s1')
+    expect(out.reason).toContain('"<skill or script>: expected <what you expected>, got <what happened>"')
     expect(out.reason).not.toMatch(/complain\.md|Application Support|\/etc\/limen/)
 
     const again = runHook({ session_id: 's1', hook_event_name: 'Stop', stop_hook_active: false }, state)
