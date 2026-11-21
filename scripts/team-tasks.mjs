@@ -768,12 +768,14 @@ function executorText(task) {
   const route = task.route ?? task.jev?.route
   if (route === 'needs_lead') return 'none: the route is held for the lead'
   if (route === 'lead_workflow') return 'none: lead_workflow runs as a lead workflow'
+  const untiered = (why) =>
+    `none for ${column(route)}: ${why}${column(route)} has no tier in jev-executors.catalog.mjs; pick one runnable catalog pair and record it in this brief`
+  if (route && !Object.hasOwn(TIER_EXECUTORS, route) && !task.jev?.executor) return untiered('')
   if (!task.jev) return `none yet (run jev-route.ts --task ${task.id} --available <file>)`
   if (task.jev.route !== route) {
     const was = task.jev.route === 'needs_lead' ? 'the verdict held this task' : `the verdict's executor is for ${column(task.jev.route)}`
-    if (!Object.hasOwn(TIER_EXECUTORS, route))
-      return `none for ${column(route)}: ${was}, and ${column(route)} has no tier in jev-executors.catalog.mjs; pick one runnable catalog pair and record it in this brief`
-    return `none for ${route}: ${was}; take the first available ${route} entry in jev-executors.catalog.mjs and record the choice in this brief`
+    if (!Object.hasOwn(TIER_EXECUTORS, route)) return untiered(`${was}, and `)
+    return `none for ${column(route)}: ${was}; take the first available ${column(route)} entry in jev-executors.catalog.mjs and record the choice in this brief`
   }
   const executor = task.jev.executor
   if (!executor) return 'none: the verdict offered none for this route'
