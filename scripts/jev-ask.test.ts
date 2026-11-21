@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { main } from './jev-ask.ts'
-import { readAsk, readCheck, type Ask } from './jev-ask.lib.ts'
+import { buildCheckRequest, GAPS, readAsk, readCheck, type Ask } from './jev-ask.lib.ts'
 
 const yesNo: Ask = { kind: 'yes_no', question: 'Is the label whole?' }
 const pick: Ask = { kind: 'pick', question: 'Which fix?', labels: { alpha: 'alpha', beta: 'beta' } }
@@ -18,6 +18,17 @@ function noul(p: number) {
 function choice(choiceLabel: string, confidence: number, alpha: number, beta: number) {
   return { pick: { choice: choiceLabel, confidence, probabilities: { alpha, beta } } }
 }
+
+describe('check request wording', () => {
+  it('asks whether the acceptance is met, so a required red run is not read as failing', () => {
+    const { questions } = buildCheckRequest({ title: 't', accept: 'New test fails on main, zero skips.' }, 's', [])
+    const text = JSON.stringify(questions)
+    expect(text).toContain('This team follows TDD')
+    expect(text).toContain('a test that fails for the stated reason meets it')
+    expect(text).not.toMatch(/check passed|did not pass|`task.accept` passed/)
+    expect(GAPS.failing).toContain('not met')
+  })
+})
 
 describe('readAsk and readCheck', () => {
   it('maps yes/no and pick boundaries, and holds a malformed answer', () => {

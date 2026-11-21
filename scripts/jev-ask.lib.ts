@@ -45,11 +45,14 @@ export const ASK_THRESHOLDS = {
 } as const
 
 export const GAPS = {
-  fits: 'The evidence shows the acceptance check passed',
+  fits: 'The evidence shows every condition in task.accept is met',
   incomplete: 'The evidence is missing part of what the acceptance check names',
   other_check: 'The evidence is about something other than the acceptance check',
-  failing: 'The evidence shows the acceptance check did not pass',
+  failing: 'The evidence shows a condition in task.accept is not met',
 } as const
+
+// Without this line Jev reads a test-first task's required red run as a failed check.
+const RED_RUN = 'This team follows TDD: a test-writing task is done when its new tests fail on the unchanged code for the reason the task states. When `task.accept` asks for a test to fail, a test that fails for the stated reason meets it, and a passing test would not.'
 
 export type Gap = keyof typeof GAPS
 export type AskOutcome = {
@@ -125,8 +128,8 @@ export function buildCheckRequest(
   return {
     state: { task, summary, ...evidence },
     questions: {
-      fits: noul(`${scope}Does the attached evidence show that \`task.accept\` passed?`),
-      gap: choice(`${scope}Which gap label fits the evidence against the acceptance check?`, GAPS),
+      fits: noul(`${scope}Does the attached evidence show that every condition in \`task.accept\` is met? ${RED_RUN}`),
+      gap: choice(`${scope}Which gap label fits the evidence against \`task.accept\`? ${RED_RUN}`, GAPS),
     },
   }
 }
