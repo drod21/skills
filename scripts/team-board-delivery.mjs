@@ -278,12 +278,16 @@ function earlierClaim(task, record) {
 
 /** @param {any} record */
 function openClaimOnly(record) {
-  if (!record || record.audience?.kind !== 'claim' || mayFallBackToLead(record.entryKind)) return false
+  if (!record) return false
+  // An accept tells the claim's worker to finish, so it is stale once that claim is over, whichever thread it would
+  // reach. A send already in flight is left to report its own outcome.
+  if (record.entryKind === 'accept') return record.state === 'pending' || record.state === 'unaddressed'
+  if (record.audience?.kind !== 'claim' || mayFallBackToLead(record.entryKind)) return false
   return record.state === 'pending' || record.state === 'unaddressed' || record.state === 'sending'
 }
 
 /**
- * A claim-only record cannot be delivered once its claim is over. Fail it so archive can proceed.
+ * A claim-only record, and an accept, cannot be delivered once its claim is over. Fail it so archive can proceed.
  * @param {any} task
  * @param {Date} now
  */
@@ -316,11 +320,41 @@ function sourceEntry(task, record) {
   return entries[same.indexOf(record)] ?? entries[0] ?? null
 }
 
-/** @param {any} entry */
-function authorName(entry) {
-  const by = storedText(entry?.by)
-  if (!by || by === BOARD_OWNER) return 'The owner'
-  return by
+// Every field of a delivered message is text a person typed. One bound keeps it from forging the frame the agent
+// reads: a line field becomes one line, and the body keeps its own lines but never a frame line or a control character.
+const AUTHOR_LIMIT = 80
+const TITLE_LIMIT = 200
+
+/** A line field: each control character and line break becomes a space, runs collapse, and it is cut to `limit`. */
+function oneLine(value, limit) {
+  return String(value ?? '')
+    .replace(/[\p{Cc}\p{Zl}\p{Zp}]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, limit)
+}
+
+// A body line that would read as part of the message's own frame: a line of dashes, or a labelled command line.
+const FRAME_LINE = /^\s*(?:-{3,}\s*$|(?:Finish|Acknowledge|Reply|Read it)\s*:|Delivery\s+\S+\.)/i
+
+/** The body: line breaks become "\n", other control characters go, and a frame-like line is escaped with a backslash. */
+function bodyText(value) {
+  return String(value ?? '')
+    .replace(/\r\n|[\r\x85\p{Zl}\p{Zp}]/gu, '\n')
+    .replace(/(?![\n\t])\p{Cc}/gu, '')
+    .slice(0, MESSAGE_LIMIT)
+    .split('\n')
+    .map((line) => (FRAME_LINE.test(line) ? `\\${line.trim()}` : line))
+    .join('\n')
+}
+
+/**
+ * @param {any} entry
+ * @param {string} [fallback]
+ */
+function authorName(entry, fallback = 'The owner') {
+  const by = oneLine(entry?.by, AUTHOR_LIMIT)
+  return !by || by === BOARD_OWNER ? fallback : by
 }
 
 /**
@@ -331,10 +365,7 @@ function headlineFor(entryKind, entry) {
   if (entryKind === 'note') return `${authorName(entry)} left a note.`
   if (entryKind === 'owner-answer') return `${authorName(entry)} answered your question.`
   if (entryKind === 'accept') return `${authorName(entry)} accepted your evidence.`
-  if (entryKind === 'lead-reply') {
-    const by = storedText(entry?.by)
-    return `${!by || by === BOARD_OWNER ? 'The lead' : by} answered your question.`
-  }
+  if (entryKind === 'lead-reply') return `${authorName(entry, 'The lead')} answered your question.`
   return ruleFor(entryKind)?.headline ?? 'There is a message on this task.'
 }
 
@@ -358,10 +389,10 @@ function messageText(board, task, record, scriptPath) {
   const script = /^[\w./-]+$/.test(scriptPath) ? scriptPath : `'${scriptPath.replaceAll("'", "'\\''")}'`
   const show = `node ${script} show ${task.id}`
   return [
-    `${boardLabel()}, task ${task.id}: ${String(task.title).replace(/\s+/g, ' ').slice(0, 200)}`,
+    `${boardLabel()}, task ${task.id}: ${oneLine(task.title, TITLE_LIMIT)}`,
     headlineFor(record.entryKind, entry),
     '---',
-    String((record.entryKind === 'accept' ? entry?.reason : entry?.text) ?? '').slice(0, MESSAGE_LIMIT),
+    bodyText(record.entryKind === 'accept' ? entry?.reason : entry?.text),
     '---',
     `Read it:     ${show}`,
     ...commandLines(board, task, record, script),

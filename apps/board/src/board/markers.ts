@@ -24,8 +24,13 @@ export function threadMarks(thread: Thread): Mark[] {
 
 function deliveryMark(card: BoardCard): Mark[] {
   if (card.undelivered === 0) return []
-  const stuck = card.messages.some((message) =>
-    message.deliveries.some((delivery) => delivery.state === 'failed' || delivery.state === 'unaddressed'),
+  // Every outbox record counts, an accept as much as a message: the message records, then any other record the card
+  // lists. A CLI from before the card listed them reports only the message records.
+  const records = card.messages.flatMap((message) => message.deliveries)
+  const seen = new Set(records.map((delivery) => delivery.id))
+  const others = (card.deliveries ?? []).filter((delivery) => !seen.has(delivery.id))
+  const stuck = [...records, ...others].some(
+    (delivery) => delivery.state === 'failed' || delivery.state === 'unaddressed',
   )
   return [
     stuck

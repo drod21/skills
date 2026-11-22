@@ -133,6 +133,11 @@ function eventText(entry: ThreadEntry): string {
 
 function messageOf(entry: ThreadEntry, index: number, thread: Thread, clock: Clock): MessageItem | null {
   const own = (who: string): Pick<MessageItem, 'from' | 'who'> => ({ from: 'owner', who })
+  const deliveries = thread.deliveries
+    .filter((record) => record.entryKind === entry.kind && record.entryAt === entry.at)
+    .map((record) => deliveryView(record, clock))
+  // An accept is an event line until it queues a delivery: then it is a message too, so a delivery that failed has a
+  // row to retry from.
   const side: Pick<MessageItem, 'from' | 'who'> | null =
     entry.kind === 'owner-answer' || entry.kind === 'note'
       ? own('You')
@@ -140,17 +145,16 @@ function messageOf(entry: ThreadEntry, index: number, thread: Thread, clock: Clo
         ? { from: 'agent', who: person(entry.by, 'A worker') }
         : entry.kind === 'lead-reply'
           ? { from: 'agent', who: person(entry.by, 'The lead') }
-          : null
+          : entry.kind === 'accept' && deliveries.length > 0
+            ? own(person(entry.by, 'Someone'))
+            : null
   if (side === null) return null
-  const deliveries = thread.deliveries
-    .filter((record) => record.entryKind === entry.kind && record.entryAt === entry.at)
-    .map((record) => deliveryView(record, clock))
   return {
     type: 'message',
     key: `${entry.kind}-${entry.at}-${index}`,
     ...side,
     at: entry.at,
-    text: entry.text ?? '',
+    text: entry.kind === 'accept' ? withReason('Accepted the held check', entry.reason) : (entry.text ?? ''),
     reopened: entry.reopened,
     deliveries,
   }
