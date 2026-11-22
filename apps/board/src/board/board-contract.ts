@@ -54,6 +54,8 @@ const Card = type({
   doneBlockers: 'string[]',
   reviewRevision: 'string',
   messages: Message.array(),
+  // Every outbox record, an accept included. A CLI from before the card listed them leaves it out.
+  'deliveries?': Delivery.array(),
   undelivered: 'number.integer >= 0',
 })
 
