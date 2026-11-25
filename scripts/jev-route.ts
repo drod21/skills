@@ -8,8 +8,8 @@ import './jev-node-only.mjs'
 // suggested role when Jev is confident the submitted role does not fit.
 // --task <id> reads that task's title, role, and after from the board. It does not take a CLI title, --role, or --after.
 // A done or cancelled task is refused before Jev is called.
-// After the route is decided, one more Jev question picks among the route's available executors
-// (scripts/jev-executors.lib.ts). --available <file> is a JSON list the lead writes from the harness catalog
+// After the route is decided, the route's first available executor carries it (scripts/jev-executors.lib.ts);
+// no second Jev call. --available <file> is a JSON list the lead writes from the harness catalog
 // ("providerInstanceId:model" strings or objects); without it every registry executor counts. --unavailable
 // <providerInstanceId[:model]> (repeatable) drops a known outage. The printed verdict carries `executor`.
 // Needs TYPESAFE_API_KEY.
@@ -24,16 +24,13 @@ import { TypeSafeClient } from '@typesafe-ai/sdk'
 import * as z from 'zod'
 
 import {
-  askExecutor,
   TIER_EXECUTORS,
   availableFor,
   isTierRoute,
   parseAvailableText,
   pickExecutor,
-  readChoice,
   verdictExecutor,
   type Availability,
-  type ChoiceAnswer,
   type VerdictExecutor,
 } from './jev-executors.lib.ts'
 import { assertApiKeyAbsent, cleanText, redactApiKey } from './jev-guard.lib.ts'
@@ -145,23 +142,16 @@ function safeDependencyTitle(title: string) {
   }
 }
 
-/** The executor chosen for a decided route, with its allow-listed answer for calibration. */
+/** The executor chosen for a decided route. */
 export type ExecutorOutcome = {
   executor: VerdictExecutor | null
   reasons: string[]
-  /** Ids offered to Jev; empty when it was not asked. */
-  offered: string[]
-  answer: ChoiceAnswer | null
 }
 
-const NO_EXECUTOR: ExecutorOutcome = { executor: null, reasons: [], offered: [], answer: null }
+const NO_EXECUTOR: ExecutorOutcome = { executor: null, reasons: [] }
 
-/**
- * The verdict stored on the board, with Jev's raw answers for recalibration. team-tasks stamps `at`.
- * The executor question's allow-listed answer rides in `answers.executor_pick` when Jev was asked.
- */
+/** The verdict stored on the board, with Jev's raw answers for recalibration. team-tasks stamps `at`. */
 export function verdictFrom(decision: Decision, answers: Answers, outcome: ExecutorOutcome = NO_EXECUTOR) {
-  const asked = outcome.offered.length >= 2
   return {
     route: decision.route,
     jevRoute: decision.jevRoute,
@@ -172,30 +162,15 @@ export function verdictFrom(decision: Decision, answers: Answers, outcome: Execu
     check: decision.check,
     reasons: [...decision.reasons, ...outcome.reasons],
     executor: outcome.executor,
-    answers: asked ? { ...answers, executor_pick: { offered: outcome.offered, ...outcome.answer } } : answers,
+    answers,
   }
 }
 
-/** Chooses the executor for a decided route. A held, scripted, or non-tier route gets none. */
-async function chooseExecutor(
-  client: Pick<TypeSafeClient, 'systemOne'>,
-  task: Task,
-  decision: Decision,
-  availability: Availability | undefined,
-  cachedPick?: { answer: ChoiceAnswer | null },
-): Promise<ExecutorOutcome> {
+/** The executor for a decided route: the tier's first available entry. A held, scripted, or non-tier route gets none. */
+function chooseExecutor(decision: Decision, availability: Availability | undefined): ExecutorOutcome {
   if (decision.holds.length || !isTierRoute(decision.route)) return NO_EXECUTOR
-  const offered = availableFor(decision.route, availability)
-  const reused = cachedPick && readChoice(cachedPick.answer, offered)
-  const { pick, answer } = cachedPick
-    ? { pick: pickExecutor(decision.route, offered, reused ?? null, THRESHOLDS.minExecutorConfidence), answer: reused ?? null }
-    : await askExecutor(client, task, decision.route, offered, THRESHOLDS.minExecutorConfidence)
-  return {
-    executor: verdictExecutor(pick),
-    reasons: pick.reasons,
-    offered: offered.map((entry) => entry.id),
-    answer,
-  }
+  const pick = pickExecutor(decision.route, availableFor(decision.route, availability))
+  return { executor: verdictExecutor(pick), reasons: pick.reasons }
 }
 
 export type BoardExec = (script: string, args: string[]) => void
@@ -340,7 +315,7 @@ function pickSubjects(tasks: Task[], boardTasks: BoardTask[], options: RouteOpti
 const needsBoard = (tasks: Task[], options: RouteOptions) =>
   Boolean(options.taskId) || tasks.some((task) => Boolean(task.after?.length))
 
-type ReusableRoute = { answers: Answers; answer: ChoiceAnswer | null }
+type ReusableRoute = { answers: Answers }
 
 function reusePath(task: Task, { reuse, availability }: RouteOptions) {
   if (!reuse || !availability?.available) return null
@@ -363,12 +338,9 @@ function loadReusableRoute(path: string | null, task: Task, availability?: Avail
     const decision = decide(cached.answers, task)
     if (decision.holds.length || decision.roleFits !== true) return null
     if (isTierRoute(decision.route)) {
-      const offered = availableFor(decision.route, availability)
-      const choice = readChoice(cached.answer, offered)
-      if (!offered.length || (offered.length > 1 && (!choice || choice.confidence < THRESHOLDS.minExecutorConfidence)))
-        return null
+      if (!availableFor(decision.route, availability).length) return null
     } else if (decision.route !== 'deterministic_script') return null
-    return cached
+    return { answers: cached.answers }
   } catch {
     return null
   }
@@ -404,14 +376,13 @@ export async function routeTasks(tasks: Task[], client: Pick<TypeSafeClient, 'sy
   const results = []
   for (const { task, answers, path, cached } of answered) {
     const decision = decide(answers, task)
-    const outcome = await chooseExecutor(client, task, decision, options.availability, cached ?? undefined)
+    const outcome = chooseExecutor(decision, options.availability)
     const verdict = verdictFrom(decision, answers, outcome)
     // On --add, Jev's confident owner replaces a role it judged wrong. An existing task keeps its role.
     const role = options.add && decision.adoptRole && decision.suggestedRole ? decision.suggestedRole : task.role
     const save = path && !cached && decision.roleFits === true && !decision.holds.length &&
-      (decision.route === 'deterministic_script' || (outcome.executor && (outcome.offered.length === 1 || outcome.executor.source === 'jev')))
-    if (save)
-      saveReusableRoute(path, { answers, answer: outcome.answer })
+      (decision.route === 'deterministic_script' || Boolean(outcome.executor))
+    if (save) saveReusableRoute(path, { answers })
     const line = printedLine(task, role, verdict, answers)
     log(cached || save ? JSON.stringify({ ...JSON.parse(line), reused: Boolean(cached), routingReceipt: path }) : line)
     writeVerdict(exec, board, task, role, decision, verdict, options)

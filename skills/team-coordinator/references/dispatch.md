@@ -1,7 +1,7 @@
 # Dispatch and finish
 
 Use the harness's live capability catalog to select an available executor; route
-labels such as `terra_patch` are hints, not provider or model IDs. Honor an
+labels such as `opus_patch` are hints, not provider or model IDs. Honor an
 explicit user model choice. If it is unavailable, report that rather than
 silently substituting. Use the harness's delegation tool (a delegate-task tool,
 Claude Code `Agent`, Codex `spawn_agent`) with worktree isolation when requested
@@ -41,11 +41,40 @@ overrides both. Never pick by preference or by which provider happens to be up.
 `jev-executors.catalog.mjs` is the registry: an ordered list of executors per
 route, the first being the tier default. Each entry carries facts only (family,
 list price, a code-specialized name), no quality ranking. After the route is
-decided, Jev picks among the available entries and its pick stands only at
-`minExecutorConfidence` or above; otherwise the first available entry stands
-(`source: "default"`). `executor: null` means the tier has nothing available or
+decided, the first available entry carries it (`source: "default"`); there is no
+second Jev call, and later entries are only outage fallbacks. A stored
+`source: "jev"` is from an older verdict. `executor: null` means the tier has nothing available or
 the route is held or scripted. For a route outside the registry's tiers, the lead
 picks one catalog pair and records it in the brief.
+
+## Model roles
+
+Each model has one job. Jev's table covers the patch tiers; the lead picks the
+pair for the other rows and records it in the brief.
+
+| Job | Route | Default pair |
+| --- | --- | --- |
+| Lead: spec, split, the hardest slice | lead, `claude_design`, `fable_patch` | `claudeAgent_2:claude-fable-5-2` |
+| Builder: a subtle slice in its own worktree | `opus_patch` | `claudeAgent_2:claude-opus-5-5` |
+| Code workhorse: ordinary slices, in waves | `sonnet_patch` | `claudeAgent_2:claude-sonnet-5-5` |
+| Chores: one file, mechanical work | `haiku_fork`, `luna_patch` | `claudeAgent_2:claude-haiku-5-5`, `codex:gpt-6-luna` |
+| Fast spec draft from an agreed goal | `codex_design` | `codex:gpt-6.2-sol` (`reasoningEffort: high`) |
+| Second opinion from another family | `gemini_review` | `cursor:gemini-4-argon` |
+| Playtester: break the candidate build | `codex_audit` | `codex:gpt-6.2-astra` (`reasoningEffort: high`) |
+| Copywriter: docs, changelog, UI copy | `gemini_patch` | `cursor:gemini-4-neon` |
+
+Codex 6.2 models default to low effort; always pass `reasoningEffort: high`.
+Fable costs twice Opus, so it takes only subtle cross-package work and the
+lead's own spec and split.
+
+- **Opus builders:** one slice per builder. Run several builders at once, each in
+  its own worktree with disjoint files; never hand one builder two slices.
+- **Sonnet waves:** dispatch `sonnet_patch` tasks two or more at a time, never one
+  alone. When only one is ready, hold it until a second `sonnet_patch` task is
+  ready in the same plan; if none is coming, re-route it to `opus_patch` with
+  `route <id> opus_patch --reason "lone sonnet slice" --by <lead>`.
+- `grok_patch` and `terra_patch` are no longer emitted. Their tiers stay so
+  stored verdicts and earlier lead overrides still match.
 
 A `needs_lead` verdict or hold stays with the lead. A retained author that
 continues its own work keeps its model. When the routed executor is unavailable or

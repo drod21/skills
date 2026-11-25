@@ -99,8 +99,11 @@ instruction, make it a lint, a flag, a runtime check or a script.
 
 - Spawn with background execution by default, file pointers instead of inlined
   context, and an explicit model per role. Tier code delegates by difficulty:
-  trivial mechanical edits to the fast model, the hardest changes (cross-cutting
-  design, gnarly concurrency, subtle algorithms) to the strongest judgment model.
+  chores to Haiku or Luna, ordinary slices to Sonnet in parallel waves (never one
+  Sonnet alone), subtle slices to Opus (one slice per builder, builders in
+  parallel worktrees), and the hardest cross-cutting work to Fable. Fast spec
+  drafts go to GPT-6.2 Sol, a second opinion to Gemini 4 Argon, build-breaking
+  playtests to GPT-6.2 Astra, and copy to Gemini 4 Neon.
   Read the user's model configuration (`~/.claude/rules/pstack-models.md` or
   `~/.agents/pstack-models.md`) if present; a role it marks `inherit-parent` runs on
   the parent model. In a task-board team, Jev routing overrides this tiering.

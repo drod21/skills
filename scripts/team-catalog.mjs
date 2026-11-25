@@ -79,11 +79,14 @@ export const JEV_ROUTES = /** @type {const} */ ([
   'sonnet_patch',
   'sol_patch',
   'terra_patch',
+  'opus_patch',
+  'fable_patch',
   'deterministic_script',
   'needs_lead',
 ])
 
-// codex_* routes are board-only: the other lead uses them. They are not Jev routes.
+// The *_review, *_audit, *_design and claude_/codex_patch routes are board-only, not Jev routes. A lead picks
+// their pair from the model roles table in skills/team-coordinator/references/dispatch.md.
 // lead_workflow is the lead running the task through an orchestration workflow or T3 delegation.
 /** @type {const} */
 export const KNOWN_ROUTES = [

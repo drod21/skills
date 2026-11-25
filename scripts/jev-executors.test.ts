@@ -7,26 +7,20 @@ import { describe, expect, it } from 'vitest'
 
 import {
   allExecutors,
-  askExecutor,
   availableFor,
-  buildPickRequest,
   isTierRoute,
+  LEGACY_TIER_ROUTES,
   parseAvailable,
   parseAvailableText,
   pickExecutor,
-  readChoice,
   TIER_EXECUTORS,
   TIER_ROUTES,
   verdictExecutor,
-  type ChoiceAnswer,
-  type TierRoute,
 } from './jev-executors.lib.ts'
 import { availabilityFlags, routeTasks } from './jev-route.ts'
-import { EXECUTORS, THRESHOLDS, type Answers } from './jev-route.lib.ts'
+import { EXECUTORS, type Answers } from './jev-route.lib.ts'
 
-const MIN = THRESHOLDS.minExecutorConfidence
 const ids = (list: readonly { id: string }[]) => list.map((entry) => entry.id)
-const answer = (choice: string, confidence = 0.9): ChoiceAnswer => ({ choice, confidence })
 
 describe('executor registry', () => {
   it('has unique ids, and an id repeated across tiers is the same executor', () => {
@@ -50,12 +44,16 @@ describe('executor registry', () => {
       grok_patch: 'cursor:grok-4.7',
       sonnet_patch: 'claudeAgent_2:claude-sonnet-5-5',
       terra_patch: 'codex:gpt-6.1-terra',
+      opus_patch: 'claudeAgent_2:claude-opus-5-5',
+      fable_patch: 'claudeAgent_2:claude-fable-5-2',
     })
   })
 
   it('covers every dispatchable route the scope x subtlety table emits', () => {
     const emitted = new Set<string>(Object.values(EXECUTORS).flat())
-    expect(new Set<string>(TIER_ROUTES)).toEqual(emitted)
+    const current = TIER_ROUTES.filter((route) => !(LEGACY_TIER_ROUTES as readonly string[]).includes(route))
+    expect(new Set<string>(current)).toEqual(emitted)
+    for (const route of LEGACY_TIER_ROUTES) expect(emitted.has(route)).toBe(false)
     for (const route of emitted) expect(isTierRoute(route)).toBe(true)
     expect(isTierRoute('needs_lead')).toBe(false)
     expect(isTierRoute('deterministic_script')).toBe(false)
@@ -163,142 +161,26 @@ describe('availability', () => {
 describe('pickExecutor', () => {
   const offered = TIER_EXECUTORS.sonnet_patch
 
-  it('takes a confident pick among the offered executors', () => {
-    const picked = pickExecutor('sonnet_patch', offered, answer('opencode:opencode/kimi-k3', 0.8), MIN)
-    expect(picked.source).toBe('jev')
-    expect(picked.executor?.id).toBe('opencode:opencode/kimi-k3')
-  })
-
-  it('takes the pick at exactly the floor', () => {
-    expect(pickExecutor('sonnet_patch', offered, answer('opencode:opencode/kimi-k3', MIN), MIN).source).toBe('jev')
-  })
-
-  it('falls back to the tier default below the floor', () => {
-    const picked = pickExecutor('sonnet_patch', offered, answer('opencode:opencode/kimi-k3', 0.3), MIN)
-    expect(picked.source).toBe('default')
+  it('takes the tier default when it is available', () => {
+    const picked = pickExecutor('sonnet_patch', offered)
+    expect(picked).toMatchObject({ source: 'default', reasons: [] })
     expect(picked.executor?.id).toBe('claudeAgent_2:claude-sonnet-5-5')
-    expect(picked.reasons.join(' ')).toMatch(/below floor/)
-  })
-
-  it('rejects a pick that was not offered', () => {
-    const narrowed = offered.filter((entry) => entry.id !== 'opencode:opencode/kimi-k3')
-    const wide = pickExecutor('sonnet_patch', narrowed, answer('opencode:opencode/kimi-k3'), MIN)
-    expect(wide.source).toBe('default')
-    expect(wide.executor?.id).toBe('claudeAgent_2:claude-sonnet-5-5')
-    expect(wide.reasons.join(' ')).toMatch(/not offered/)
-    // An id from another tier is not offered either.
-    expect(pickExecutor('sonnet_patch', offered, answer('codex:gpt-6.1-terra'), MIN).source).toBe('default')
   })
 
   it('takes the first available executor when the tier default is out', () => {
     const rest = offered.filter((entry) => entry.providerInstanceId !== 'claudeAgent_2')
-    const picked = pickExecutor('sonnet_patch', rest, null, MIN)
+    const picked = pickExecutor('sonnet_patch', rest)
     expect(picked.executor?.id).toBe(rest[0]?.id)
     expect(picked.source).toBe('default')
     expect(picked.reasons.join(' ')).toMatch(/tier default claudeAgent_2:claude-sonnet-5-5 is unavailable/)
   })
 
-  it('needs no answer for a single available executor', () => {
-    const [only] = offered
-    const picked = pickExecutor('sonnet_patch', [only!], null, MIN)
-    expect(picked).toMatchObject({ source: 'default', reasons: [] })
-    expect(picked.executor).toBe(only)
-  })
-
   it('returns no executor for an empty tier and says the lead picks', () => {
-    const picked = pickExecutor('terra_patch', [], answer('codex:gpt-6.1-terra'), MIN)
+    const picked = pickExecutor('opus_patch', [])
     expect(picked.executor).toBeNull()
     expect(picked.source).toBeNull()
-    expect(picked.reasons.join(' ')).toMatch(/no executor is available for terra_patch; the lead picks/)
+    expect(picked.reasons.join(' ')).toMatch(/no executor is available for opus_patch; the lead picks/)
     expect(verdictExecutor(picked)).toBeNull()
-  })
-
-  it('reads only well-formed choice answers', () => {
-    const id = offered[0]!.id
-    expect(readChoice({ choice: id, confidence: 0.7, probabilities: { [id]: 0.7, secret: 0.2 } }, offered)).toEqual({
-      choice: id,
-      confidence: 0.7,
-      probabilities: { [id]: 0.7 },
-    })
-    expect(readChoice({ choice: id, confidence: 0.7, apiKey: 'sk-test' }, offered)).toEqual({
-      choice: id,
-      confidence: 0.7,
-    })
-    expect(readChoice({ choice: 'secret', confidence: 0.9 }, offered)).toBeNull()
-    expect(readChoice({ choice: id, confidence: 1.2 }, offered)).toBeNull()
-    expect(readChoice({ choice: 3, confidence: 0.5 }, offered)).toBeNull()
-    expect(readChoice(undefined, offered)).toBeNull()
-  })
-})
-
-describe('askExecutor', () => {
-  const clientReturning = (executor: unknown) => {
-    const sent: { questions?: Record<string, unknown>; state?: Record<string, unknown> }[] = []
-    const client = {
-      systemOne: async (request: (typeof sent)[number]) => (sent.push(request), { answers: { executor } }),
-    } as unknown as Pick<TypeSafeClient, 'systemOne'>
-    return { client, sent }
-  }
-  const task = { title: 'Wire the new route', role: 'backend-worker', brief: 'Allowed: apps/server/src/x.ts' }
-
-  it('asks once, offering only the available executors, and returns the raw answer', async () => {
-    const offered = availableFor('sonnet_patch', { unavailable: ['opencode:opencode/mistral-large-4'] })
-    const { client, sent } = clientReturning({ choice: 'opencode:opencode/kimi-k3', confidence: 0.9 })
-    const result = await askExecutor(client, task, 'sonnet_patch', offered, MIN)
-    expect(sent).toHaveLength(1)
-    expect(result.pick.executor?.id).toBe('opencode:opencode/kimi-k3')
-    expect(result.answer).toEqual({ choice: 'opencode:opencode/kimi-k3', confidence: 0.9 })
-    const request = buildPickRequest(task, 'sonnet_patch', offered)
-    expect(sent[0]).toEqual(request)
-    expect(request.state.task).toEqual({ title: task.title, role: task.role, brief: task.brief })
-    expect(request.state.tier.purpose).toMatch(/Several packages/)
-    const json = JSON.stringify(request)
-    expect(json).toContain('claudeAgent_2:claude-sonnet-5-5')
-    expect(json).not.toContain('mistral-large-4')
-    expect(json).toMatch(/\$3 in \/ \$15 out per million tokens/)
-  })
-
-  it('makes no call for zero or one available executor', async () => {
-    const { client, sent } = clientReturning({ choice: 'x', confidence: 1 })
-    const none = await askExecutor(client, task, 'terra_patch', [], MIN)
-    const one = await askExecutor(client, task, 'terra_patch', availableFor('terra_patch').slice(0, 1), MIN)
-    expect(sent).toHaveLength(0)
-    expect(none.pick.executor).toBeNull()
-    expect(one.pick.executor?.id).toBe('codex:gpt-6.1-terra')
-    expect(one.answer).toBeNull()
-  })
-
-  it('falls back to the default on an unreadable answer', async () => {
-    const { client } = clientReturning('nonsense')
-    const result = await askExecutor(client, task, 'luna_patch', availableFor('luna_patch'), MIN)
-    expect(result.pick).toMatchObject({ source: 'default' })
-    expect(result.pick.executor?.id).toBe('codex:gpt-6-luna')
-  })
-
-  it('falls back when the choice answer is malformed and drops the payload', async () => {
-    const { client } = clientReturning({
-      choice: 3,
-      confidence: 0.9,
-      apiKey: 'sk-test',
-      dangerouslySkipPermissions: true,
-    })
-    const result = await askExecutor(client, task, 'luna_patch', availableFor('luna_patch'), MIN)
-    expect(result.answer).toBeNull()
-    expect(result.pick.source).toBe('default')
-    expect(result.pick.executor?.id).toBe('codex:gpt-6-luna')
-    expect(JSON.stringify(result)).not.toContain('sk-test')
-    expect(JSON.stringify(result)).not.toContain('dangerouslySkipPermissions')
-  })
-
-  it('falls back to the default, and says why, when the call throws', async () => {
-    const client = {
-      systemOne: async () => {
-        throw new Error('503 overloaded')
-      },
-    } as unknown as Pick<TypeSafeClient, 'systemOne'>
-    const result = await askExecutor(client, task, 'luna_patch', availableFor('luna_patch'), MIN)
-    expect(result.pick.executor?.id).toBe('codex:gpt-6-luna')
-    expect(result.pick.reasons.join(' ')).toMatch(/executor pick failed/)
   })
 })
 
@@ -322,23 +204,20 @@ describe('executor in routed verdicts', () => {
     }
   }
 
-  const clientFor = (answers: Answers, pick: unknown) => {
-    let calls = 0
+  const clientFor = (answers: Answers) => {
+    const sent: { questions: Record<string, unknown> }[] = []
     const client = {
-      systemOne: async (request: { questions: Record<string, unknown> }) => {
-        calls += 1
-        return 'executor' in request.questions ? { answers: { executor: pick } } : { answers }
-      },
+      systemOne: async (request: { questions: Record<string, unknown> }) => (sent.push(request), { answers }),
     } as unknown as Pick<TypeSafeClient, 'systemOne'>
-    return { client, calls: () => calls }
+    return { client, sent }
   }
 
   const sample = [{ title: 'Add the sessions field across packages', role: 'backend-worker' }]
   const quiet = { log: () => {}, exec: () => {} }
 
-  it('adds the picked executor and the raw answer to the verdict, and passes it to the board', async () => {
+  it('makes one Jev call and stores the tier default on the verdict and the board', async () => {
     const execs: string[][] = []
-    const { client, calls } = clientFor(full(), { choice: 'opencode:opencode/kimi-k3', confidence: 0.8 })
+    const { client, sent } = clientFor(full())
     const lines: string[] = []
     const [result] = await routeTasks(sample, client, {
       add: true,
@@ -346,62 +225,30 @@ describe('executor in routed verdicts', () => {
       exec: (_script, args) => void execs.push(args),
       log: (line) => lines.push(line),
     })
-    expect(calls()).toBe(2)
+    expect(sent).toHaveLength(1)
+    expect(sent[0]!.questions).not.toHaveProperty('executor')
     expect(result!.decision.route).toBe('sonnet_patch')
     expect(result!.verdict.executor).toEqual({
-      id: 'opencode:opencode/kimi-k3',
-      providerInstanceId: 'opencode',
-      model: 'opencode/kimi-k3',
-      options: {},
-      source: 'jev',
+      id: 'claudeAgent_2:claude-sonnet-5-5',
+      providerInstanceId: 'claudeAgent_2',
+      model: 'claude-sonnet-5-5',
+      options: { effort: 'high' },
+      source: 'default',
     })
-    expect(result!.verdict.answers).toMatchObject({
-      executor_pick: { choice: 'opencode:opencode/kimi-k3', confidence: 0.8 },
-    })
+    expect(result!.verdict.answers).not.toHaveProperty('executor_pick')
     expect(JSON.parse(lines[0]!).executor).toEqual(result!.verdict.executor)
     const stored = JSON.parse(execs[0]![execs[0]!.indexOf('--jev') + 1]!)
-    expect(stored.executor.id).toBe('opencode:opencode/kimi-k3')
-    expect(stored.reasons.join(' ')).toMatch(/Jev picked opencode:opencode\/kimi-k3/)
-    expect(JSON.stringify(stored.answers).length).toBeLessThan(16_000)
+    expect(stored.executor.id).toBe('claudeAgent_2:claude-sonnet-5-5')
   })
 
-  it('uses the tier default on a low-confidence pick', async () => {
-    const { client } = clientFor(full(), { choice: 'opencode:opencode/kimi-k3', confidence: 0.2 })
-    const [result] = await routeTasks(sample, client, quiet)
-    expect(result!.verdict.executor).toMatchObject({ id: 'claudeAgent_2:claude-sonnet-5-5', source: 'default' })
-  })
-
-  it('never emits or stores untrusted choice text or probability keys', async () => {
-    const secret = 'synthetic-secret-1165'
-    for (const pick of [
-      { choice: secret, confidence: 0.9 },
-      { choice: 'opencode:opencode/kimi-k3', confidence: 0.9, probabilities: { [secret]: 0.7 } },
-    ]) {
-      const lines: string[] = []
-      const execs: string[][] = []
-      const { client } = clientFor(full(), pick)
-      const result = await routeTasks(sample, client, {
-        add: true,
-        accept: 'Field exists',
-        log: (line) => lines.push(line),
-        exec: (_script, args) => void execs.push(args),
-      })
-      expect(JSON.stringify({ result, lines, execs })).not.toContain(secret)
-    }
-  })
-
-  it('honors --unavailable and --available before asking', async () => {
-    const { client } = clientFor(full(), { choice: 'claudeAgent_2:claude-sonnet-5-5', confidence: 0.99 })
+  it('honors --unavailable and --available', async () => {
+    const { client } = clientFor(full())
     const [out] = await routeTasks(sample, client, { ...quiet, availability: { unavailable: ['claudeAgent_2'] } })
-    // Jev named an executor that was filtered out, so the first available one stands.
     expect(out!.verdict.executor).toMatchObject({ id: 'cursor:kimi-k3', source: 'default' })
     const available = parseAvailable(['claudeAgent_2:claude-sonnet-5-5'])
-    const only = clientFor(full(), { choice: 'x', confidence: 1 })
-    const [single] = await routeTasks(sample, only.client, { ...quiet, availability: { available } })
-    expect(only.calls()).toBe(1)
+    const [single] = await routeTasks(sample, clientFor(full()).client, { ...quiet, availability: { available } })
     expect(single!.verdict.executor).toMatchObject({ id: 'claudeAgent_2:claude-sonnet-5-5', source: 'default' })
-    const empty = clientFor(full(), { choice: 'x', confidence: 1 })
-    const [none] = await routeTasks(sample, empty.client, {
+    const [none] = await routeTasks(sample, clientFor(full()).client, {
       ...quiet,
       availability: { available: parseAvailable(['codex:gpt-6-luna']) },
     })
@@ -409,19 +256,12 @@ describe('executor in routed verdicts', () => {
     expect(none!.verdict.reasons.join(' ')).toMatch(/no executor is available for sonnet_patch/)
   })
 
-  it('asks no executor question for a held route', async () => {
-    const { client, calls } = clientFor(full({ risky: 0.95 }), { choice: 'x', confidence: 1 })
+  it('stores no executor for a held route', async () => {
+    const { client, sent } = clientFor(full({ risky: 0.95 }))
     const [result] = await routeTasks(sample, client, quiet)
     expect(result!.decision.route).toBe('needs_lead')
-    expect(calls()).toBe(1)
+    expect(sent).toHaveLength(1)
     expect(result!.verdict.executor).toBeNull()
-    expect(result!.verdict.answers).not.toHaveProperty('executor_pick')
-  })
-
-  it.each(TIER_ROUTES)('has an executor question for %s', (route: TierRoute) => {
-    expect(Object.keys(buildPickRequest({ title: 't', role: 'r' }, route, TIER_EXECUTORS[route]).questions)).toEqual([
-      'executor',
-    ])
   })
 })
 
