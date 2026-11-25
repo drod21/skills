@@ -3,7 +3,7 @@
 // board CLI with an argument array, never a shell. Message text is one argument; the owner's name is fixed here from
 // the request's access decision, never read from the body.
 import { execFile } from 'node:child_process'
-import { type } from 'arktype'
+import * as z from 'zod'
 import { appState } from './app-state.server'
 import { MAX_CLOSED_LIMIT, runBoardView, spawnCli } from './board-cli.server'
 import type { Outcome } from './board-cli.server'
@@ -12,6 +12,7 @@ import { kickDelivery } from './delivery.server'
 import { jsonResponse } from './json-response.server'
 import { STATUS, badRequest, failure, guardWrite, outcomeResponse } from './write-guard.server'
 import type { BoardView } from '../board/board-contract'
+import { jsonParsed } from '../schema'
 import {
   AcceptBody,
   LeadBody,
@@ -33,58 +34,58 @@ const WRITE_TIMEOUT_MS = 20_000
 
 const nullable = <T>(value: T | null | undefined): T | null => value ?? null
 
-const ShownTask = type('string.json.parse').pipe(
-  type({
-    id: 'number.integer',
-    'title?': 'string | null',
-    status: 'string',
-    'role?': 'string | null',
-    'tag?': 'string | null',
-    'owner?': 'string | null',
-    'archived?': 'boolean',
-    'decisions?': 'unknown[]',
-    'deliveries?': 'unknown[]',
+const ShownTask = jsonParsed(
+  z.object({
+    id: z.number().int(),
+    title: z.string().nullable().exactOptional(),
+    status: z.string(),
+    role: z.string().nullable().exactOptional(),
+    tag: z.string().nullable().exactOptional(),
+    owner: z.string().nullable().exactOptional(),
+    archived: z.boolean().exactOptional(),
+    decisions: z.array(z.unknown()).exactOptional(),
+    deliveries: z.array(z.unknown()).exactOptional(),
   }),
 )
 
-const RawEntry = type({
-  kind: 'string',
-  'at?': 'string | null',
-  'by?': 'string | null',
-  'text?': 'string | null',
-  'reason?': 'string | null',
-  'reopened?': 'string | null',
+const RawEntry = z.object({
+  kind: z.string(),
+  at: z.string().nullable().exactOptional(),
+  by: z.string().nullable().exactOptional(),
+  text: z.string().nullable().exactOptional(),
+  reason: z.string().nullable().exactOptional(),
+  reopened: z.string().nullable().exactOptional(),
 })
 
-const RawDelivery = type({
-  id: 'string',
-  entryKind: 'string',
-  entryAt: 'string',
-  state: 'string',
-  'attempts?': 'number',
-  'audience?': type({ 'kind?': 'string' }).or('null'),
-  'threadId?': 'string | null',
-  'nextAttemptAt?': 'string | null',
-  'deliveredAt?': 'string | null',
-  'failedAt?': 'string | null',
-  'error?': 'string | null',
-  'since?': 'string | null',
-  'reason?': 'string | null',
+const RawDelivery = z.object({
+  id: z.string(),
+  entryKind: z.string(),
+  entryAt: z.string(),
+  state: z.string(),
+  attempts: z.number().exactOptional(),
+  audience: z.object({ kind: z.string().exactOptional() }).nullable().exactOptional(),
+  threadId: z.string().nullable().exactOptional(),
+  nextAttemptAt: z.string().nullable().exactOptional(),
+  deliveredAt: z.string().nullable().exactOptional(),
+  failedAt: z.string().nullable().exactOptional(),
+  error: z.string().nullable().exactOptional(),
+  since: z.string().nullable().exactOptional(),
+  reason: z.string().nullable().exactOptional(),
 })
 
 /** The entries worth a line on the thread, in the board's order. An entry that is not an object is dropped. */
 function entriesOf(raw: readonly unknown[] | undefined): ThreadEntry[] {
   const entries: ThreadEntry[] = []
   for (const candidate of raw ?? []) {
-    const entry = RawEntry(candidate)
-    if (entry instanceof type.errors) continue
+    const entry = RawEntry.safeParse(candidate)
+    if (!entry.success) continue
     entries.push({
-      kind: entry.kind,
-      at: entry.at ?? '',
-      by: nullable(entry.by),
-      text: nullable(entry.text),
-      reason: nullable(entry.reason),
-      reopened: nullable(entry.reopened),
+      kind: entry.data.kind,
+      at: entry.data.at ?? '',
+      by: nullable(entry.data.by),
+      text: nullable(entry.data.text),
+      reason: nullable(entry.data.reason),
+      reopened: nullable(entry.data.reopened),
     })
   }
   return entries
@@ -94,29 +95,30 @@ function entriesOf(raw: readonly unknown[] | undefined): ThreadEntry[] {
 function deliveriesOf(raw: readonly unknown[] | undefined): ThreadDelivery[] {
   const deliveries: ThreadDelivery[] = []
   for (const candidate of raw ?? []) {
-    const record = RawDelivery(candidate)
-    if (record instanceof type.errors) continue
+    const record = RawDelivery.safeParse(candidate)
+    if (!record.success) continue
+    const delivery = record.data
     deliveries.push({
-      id: record.id,
-      entryKind: record.entryKind,
-      entryAt: record.entryAt,
-      state: record.state,
-      attempts: record.attempts ?? 0,
-      audience: record.audience?.kind ?? null,
-      threadId: nullable(record.threadId),
-      nextAttemptAt: nullable(record.nextAttemptAt),
-      deliveredAt: nullable(record.deliveredAt),
-      failedAt: nullable(record.failedAt),
-      error: nullable(record.error),
-      since: nullable(record.since),
-      reason: nullable(record.reason),
+      id: delivery.id,
+      entryKind: delivery.entryKind,
+      entryAt: delivery.entryAt,
+      state: delivery.state,
+      attempts: delivery.attempts ?? 0,
+      audience: delivery.audience?.kind ?? null,
+      threadId: nullable(delivery.threadId),
+      nextAttemptAt: nullable(delivery.nextAttemptAt),
+      deliveredAt: nullable(delivery.deliveredAt),
+      failedAt: nullable(delivery.failedAt),
+      error: nullable(delivery.error),
+      since: nullable(delivery.since),
+      reason: nullable(delivery.reason),
     })
   }
   return deliveries
 }
 
 /** `show`'s task and `view`'s derived facts, joined into what the thread page draws. */
-export function buildThread(shown: typeof ShownTask.infer, view: BoardView): Thread {
+export function buildThread(shown: z.infer<typeof ShownTask>, view: BoardView): Thread {
   const card = [...view.tasks, ...view.closed.tasks].find((candidate) => candidate.id === shown.id)
   const holds = view.needsOwner.find((row) => row.id === shown.id)?.reasons ?? []
   // A task on an older closed page is not in `view`: its notes go to the board's lead address, if there is one.
@@ -149,14 +151,17 @@ export async function readThread(config: Config, id: number): Promise<Outcome<Th
   ])
   if (shown.failure) return { ok: false, failure: shown.failure }
   if (!view.ok) return view
-  const parsed = ShownTask(shown.stdout)
-  if (parsed instanceof type.errors) {
+  const parsed = ShownTask.safeParse(shown.stdout)
+  if (!parsed.success) {
     return {
       ok: false,
-      failure: { kind: 'output', message: `the board CLI printed a task this app cannot read: ${parsed.summary}` },
+      failure: {
+        kind: 'output',
+        message: `the board CLI printed a task this app cannot read: ${z.prettifyError(parsed.error)}`,
+      },
     }
   }
-  return { ok: true, value: buildThread(parsed, view.value) }
+  return { ok: true, value: buildThread(parsed.data, view.value) }
 }
 
 const taskId = (raw: string): number | null => (/^[1-9][0-9]{0,8}$/.test(raw) ? Number(raw) : null)
@@ -186,16 +191,16 @@ export function sendResponse(request: Request, rawId: string, deps: Deps = appSt
   return guardWrite(request, deps, async ({ actor, body }) => {
     const id = taskId(rawId)
     if (id === null) return jsonResponse(failure('refused', 'not a task id'), 404)
-    const input = SendBody(body)
-    if (input instanceof type.errors) return badRequest(input.summary)
+    const input = SendBody.safeParse(body)
+    if (!input.success) return badRequest(z.prettifyError(input.error))
     // The flags come before the text, so the text can never be read as one. It is a single argument, trimmed.
     const args = [
-      input.kind,
+      input.data.kind,
       '--by',
       actor,
-      ...(input.expected ? ['--expected', input.expected] : []),
+      ...(input.data.expected ? ['--expected', input.data.expected] : []),
       String(id),
-      input.text.trim(),
+      input.data.text.trim(),
     ]
     return outcomeResponse(await writeCommand(deps.config, args, id))
   })
@@ -206,10 +211,10 @@ export function retryResponse(request: Request, rawId: string, deps: Deps = appS
   return guardWrite(request, deps, async ({ actor, body }) => {
     const id = taskId(rawId)
     if (id === null) return jsonResponse(failure('refused', 'not a task id'), 404)
-    const input = RetryBody(body)
-    if (input instanceof type.errors) return badRequest(input.summary)
+    const input = RetryBody.safeParse(body)
+    if (!input.success) return badRequest(z.prettifyError(input.error))
     return outcomeResponse(
-      await writeCommand(deps.config, ['deliver-retry', '--by', actor, String(id), input.deliveryId], id),
+      await writeCommand(deps.config, ['deliver-retry', '--by', actor, String(id), input.data.deliveryId], id),
     )
   })
 }
@@ -219,9 +224,9 @@ export function acceptResponse(request: Request, rawId: string, deps: Deps = app
   return guardWrite(request, deps, async ({ actor, body }) => {
     const id = taskId(rawId)
     if (id === null) return jsonResponse(failure('refused', 'not a task id'), 404)
-    const input = AcceptBody(body)
-    if (input instanceof type.errors) return badRequest(input.summary)
-    const args = ['accept', '--by', actor, '--reason', input.reason.trim(), String(id)]
+    const input = AcceptBody.safeParse(body)
+    if (!input.success) return badRequest(z.prettifyError(input.error))
+    const args = ['accept', '--by', actor, '--reason', input.data.reason.trim(), String(id)]
     return outcomeResponse(await writeCommand(deps.config, args, id))
   })
 }
@@ -229,13 +234,13 @@ export function acceptResponse(request: Request, rawId: string, deps: Deps = app
 /** `POST /api/thread/lead`: set (or clear) the lead thread for the board, or for one tag. */
 export function leadResponse(request: Request, deps: Deps = appState()): Promise<Response> {
   return guardWrite(request, deps, async ({ actor, body }) => {
-    const input = LeadBody(body)
-    if (input instanceof type.errors) return badRequest(input.summary)
-    const scope = input.tag === undefined ? [] : ['--tag', input.tag]
+    const input = LeadBody.safeParse(body)
+    if (!input.success) return badRequest(z.prettifyError(input.error))
+    const scope = input.data.tag === undefined ? [] : ['--tag', input.data.tag]
     const args =
-      input.threadId === undefined
+      input.data.threadId === undefined
         ? ['lead-wake', '--clear', ...scope, '--by', actor]
-        : ['lead-wake', ...scope, '--by', actor, input.threadId]
+        : ['lead-wake', ...scope, '--by', actor, input.data.threadId]
     // A message that was waiting for an address may be deliverable now.
     return outcomeResponse(await writeCommand(deps.config, args, null))
   })
@@ -243,14 +248,16 @@ export function leadResponse(request: Request, deps: Deps = appState()): Promise
 
 // ---------------------------------------------------------------- T3 threads, for the picker
 
-const T3Threads = type('string.json.parse').pipe(
-  type({
-    threadId: 'string',
-    'title?': 'string | null',
-    'status?': 'string | null',
-    'updatedAt?': 'string | null',
-    'parentThreadId?': 'string | null',
-  }).array(),
+const T3Threads = jsonParsed(
+  z.array(
+    z.object({
+      threadId: z.string(),
+      title: z.string().nullable().exactOptional(),
+      status: z.string().nullable().exactOptional(),
+      updatedAt: z.string().nullable().exactOptional(),
+      parentThreadId: z.string().nullable().exactOptional(),
+    }),
+  ),
 )
 
 function runT3(config: Config, args: string[]): Promise<Outcome<string>> {
@@ -276,14 +283,14 @@ function runT3(config: Config, args: string[]): Promise<Outcome<string>> {
 export async function listThreads(config: Config): Promise<Outcome<ThreadListItem[]>> {
   const listed = await runT3(config, ['thread', 'list', '--project', config.project, '--json'])
   if (!listed.ok) return listed
-  const parsed = T3Threads(listed.value)
-  if (parsed instanceof type.errors) {
+  const parsed = T3Threads.safeParse(listed.value)
+  if (!parsed.success) {
     return {
       ok: false,
-      failure: { kind: 'output', message: `t3 printed a thread list this app cannot read: ${parsed.summary}` },
+      failure: { kind: 'output', message: `t3 printed a thread list this app cannot read: ${z.prettifyError(parsed.error)}` },
     }
   }
-  const threads = parsed
+  const threads = parsed.data
     .filter((thread) => thread.parentThreadId === undefined || thread.parentThreadId === null)
     .slice(0, MAX_LISTED_THREADS)
     .map((thread) => ({

@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
-import { type } from 'arktype'
+import * as z from 'zod'
 
 import { resolveBoardFile } from './team-board-path.mjs'
 
@@ -18,7 +18,7 @@ const BASE_ROLES = {
 }
 
 const ROLE_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
-const extraRoles = type({ '[string]': 'string' })
+const extraRoles = z.record(z.string(), z.string())
 
 /**
  * Extra roles from a JSON object `{ "role-name": "description" }`. A missing file adds nothing; a file that exists
@@ -34,13 +34,13 @@ export function loadExtraRoles(file) {
   } catch (err) {
     throw new Error(`${file} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`)
   }
-  const parsed = extraRoles(raw)
-  if (parsed instanceof type.errors) throw new Error(`${file} must map role names to descriptions: ${parsed.summary}`)
-  for (const [name, description] of Object.entries(parsed)) {
+  const parsed = extraRoles.safeParse(raw)
+  if (!parsed.success) throw new Error(`${file} must map role names to descriptions: ${z.prettifyError(parsed.error)}`)
+  for (const [name, description] of Object.entries(parsed.data)) {
     if (!ROLE_NAME.test(name)) throw new Error(`${file}: role ${JSON.stringify(name)} must be lowercase letters, digits and hyphens`)
     if (!description.trim()) throw new Error(`${file}: role ${JSON.stringify(name)} needs a description`)
   }
-  return parsed
+  return parsed.data
 }
 
 /** TEAM_ROLES_FILE, else team-roles.json beside the board. */

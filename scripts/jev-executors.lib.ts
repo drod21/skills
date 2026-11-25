@@ -10,7 +10,7 @@
 // failed answer costs a default dispatch, never a wrong tier. The facts below are catalog facts (family,
 // list price, a name that says "code"); none is a quality claim, so Jev has nothing to rank on but the task.
 import { choice, type TypeSafeClient } from '@typesafe-ai/sdk'
-import { type } from 'arktype'
+import * as z from 'zod'
 
 import { TIER_EXECUTORS as catalogTiers } from './jev-executors.catalog.mjs'
 import { assertApiKeyAbsent } from './jev-guard.lib.ts'
@@ -39,30 +39,29 @@ export type Executor = {
 }
 
 // The catalog module is plain JS. This schema is the boundary: past it, every row is a typed registry entry.
-const catalogRow = type({
-  '+': 'reject',
-  id: 'string',
-  providerInstanceId: 'string',
-  model: 'string',
-  options: { '[string]': 'string | number | boolean' },
-  family: 'string',
-  cost: type(['number', 'number']).or('null'),
+const catalogRow = z.strictObject({
+  id: z.string(),
+  providerInstanceId: z.string(),
+  model: z.string(),
+  options: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
+  family: z.string(),
+  cost: z.union([z.tuple([z.number(), z.number()]), z.null()]),
 })
-const tierCatalog = type({
-  '+': 'reject',
-  haiku_fork: catalogRow.array(),
-  luna_patch: catalogRow.array(),
-  grok_patch: catalogRow.array(),
-  sonnet_patch: catalogRow.array(),
-  terra_patch: catalogRow.array(),
+const tierCatalog = z.strictObject({
+  haiku_fork: z.array(catalogRow),
+  luna_patch: z.array(catalogRow),
+  grok_patch: z.array(catalogRow),
+  sonnet_patch: z.array(catalogRow),
+  terra_patch: z.array(catalogRow),
 })
-const checkedTiers = tierCatalog(catalogTiers)
-if (checkedTiers instanceof type.errors) throw new Error(`executor catalog: ${checkedTiers.summary}`)
+const checkedTiersResult = tierCatalog.safeParse(catalogTiers)
+if (!checkedTiersResult.success) throw new Error(`executor catalog: ${z.prettifyError(checkedTiersResult.error)}`)
+const checkedTiers = checkedTiersResult.data
 
 const codeSpecialized = (model: string) => /(^|[-/])code($|[-.])/.test(model)
 const executorsById = new Map<string, Executor>()
 
-function asExecutor(row: typeof catalogRow.infer): Executor {
+function asExecutor(row: z.infer<typeof catalogRow>): Executor {
   const existing = executorsById.get(row.id)
   if (existing) return existing
   const cost = row.cost
@@ -115,40 +114,45 @@ export type Availability = {
   unavailable?: readonly string[]
 }
 
-const trimmed = type('string').pipe((text) => text.trim())
+const trimmed = z.string().transform((text) => text.trim())
 const pair = trimmed
-  .narrow((text, ctx) => {
+  .refine((text) => {
     const at = text.indexOf(':')
-    return (at > 0 && at < text.length - 1) || ctx.mustBe('a providerInstanceId:model pair')
-  })
-  .pipe((text) => {
+    return at > 0 && at < text.length - 1
+  }, 'must be a providerInstanceId:model pair')
+  .transform((text) => {
     const at = text.indexOf(':')
     return `${text.slice(0, at).trim()}:${text.slice(at + 1).trim()}`
   })
-const modelToken = trimmed
-  .or(type({ '+': 'delete', id: 'string' }).pipe((model) => model.id.trim()))
-  .narrow((id, ctx) => id.length > 0 || ctx.mustBe('a model id'))
+const modelToken = z
+  .union([trimmed, z.object({ id: z.string() }).transform((model) => model.id.trim())])
+  .refine((id) => id.length > 0, 'must be a model id')
 // Extra harness fields are dropped. A string canRun is kept so the fail-closed rule can exclude it.
 // A runnable row must name what runs, so a row that passes the schema always yields at least one id.
-const availableRow = type({
-  '+': 'delete',
-  providerInstanceId: trimmed.narrow((id, ctx) => id.length > 0 || ctx.mustBe('a providerInstanceId')),
-  'model?': trimmed,
-  'models?': modelToken.array(),
-  'canRun?': 'boolean | string',
-}).narrow(
-  (row, ctx) =>
-    row.canRun !== true ||
-    Boolean(row.model) ||
-    (row.models?.length ?? 0) > 0 ||
-    ctx.mustBe('a runnable row with a model or models'),
-)
-const availableEntry = pair.or(availableRow)
-const availableList = availableEntry.array()
-const availableCatalog = type({ '+': 'delete', capabilities: availableList })
-const jsonText = type('string.json.parse')
+const availableRow = z
+  .object({
+    providerInstanceId: trimmed.refine((id) => id.length > 0, 'must be a providerInstanceId'),
+    model: trimmed.exactOptional(),
+    models: z.array(modelToken).exactOptional(),
+    canRun: z.union([z.boolean(), z.string()]).exactOptional(),
+  })
+  .refine(
+    (row) => row.canRun !== true || Boolean(row.model) || (row.models?.length ?? 0) > 0,
+    'must be a runnable row with a model or models',
+  )
+const availableEntry = z.union([pair, availableRow])
+const availableList = z.array(availableEntry)
+const availableCatalog = z.object({ capabilities: availableList })
+const jsonText = z.string().transform((value, ctx) => {
+  try {
+    return JSON.parse(value) as unknown
+  } catch (error) {
+    ctx.addIssue({ code: 'custom', message: error instanceof Error ? error.message : 'Invalid JSON' })
+    return z.NEVER
+  }
+})
 
-type AvailableEntry = typeof availableEntry.infer
+type AvailableEntry = z.infer<typeof availableEntry>
 
 function idsOf(entry: AvailableEntry): string[] {
   if (typeof entry === 'string') return [entry]
@@ -164,18 +168,18 @@ function idsOf(entry: AvailableEntry): string[] {
  * `canRun` is boolean true.
  */
 export function parseAvailable(raw: unknown): Set<string> {
-  const list = availableList(raw)
-  if (!(list instanceof type.errors)) return new Set(list.flatMap(idsOf))
-  const catalog = availableCatalog(raw)
-  if (catalog instanceof type.errors) throw new Error('--available needs a JSON list of valid entries')
-  return new Set(catalog.capabilities.flatMap(idsOf))
+  const list = availableList.safeParse(raw)
+  if (list.success) return new Set(list.data.flatMap(idsOf))
+  const catalog = availableCatalog.safeParse(raw)
+  if (!catalog.success) throw new Error('--available needs a JSON list of valid entries')
+  return new Set(catalog.data.capabilities.flatMap(idsOf))
 }
 
 /** The same set, from the raw text of an --available file. Invalid JSON is refused here. */
 export function parseAvailableText(text: string): Set<string> {
-  const json = jsonText(text)
-  if (json instanceof type.errors) throw new Error('--available is not readable JSON')
-  return parseAvailable(json)
+  const json = jsonText.safeParse(text)
+  if (!json.success) throw new Error('--available is not readable JSON')
+  return parseAvailable(json.data)
 }
 
 function unavailableBy(entry: Executor, unavailable: readonly string[]) {
@@ -197,29 +201,30 @@ export type ExecutorPick =
   | { executor: null; source: null; reasons: string[] }
   | { executor: Executor; source: 'jev' | 'default'; reasons: string[] }
 
-const unitInterval = type('number').narrow(
-  (value, ctx) => (Number.isFinite(value) && value >= 0 && value <= 1) || ctx.mustBe('a number from 0 to 1'),
-)
+const unitInterval = z
+  .number()
+  .refine((value) => Number.isFinite(value) && value >= 0 && value <= 1, 'must be a number from 0 to 1')
 // Extra fields are dropped; malformed probabilities make the answer unusable.
-const choiceAnswer = type({
-  '+': 'delete',
-  choice: 'string',
+const choiceAnswer = z.object({
+  choice: z.string(),
   confidence: unitInterval,
-  'probabilities?': { '[string]': unitInterval },
+  probabilities: z.record(z.string(), unitInterval).exactOptional(),
 })
 
 /** What Jev answered, as read from its response. Anything else counts as no answer. */
-export type ChoiceAnswer = typeof choiceAnswer.infer
+export type ChoiceAnswer = z.infer<typeof choiceAnswer>
 
 export function readChoice(raw: unknown, offered: readonly Executor[]): ChoiceAnswer | null {
   const ids = new Set(offered.map((entry) => entry.id))
-  const schema = choiceAnswer.narrow((value) => ids.has(value.choice))
-  const parsed = schema(raw)
-  if (parsed instanceof type.errors) return null
+  const schema = choiceAnswer.refine((value) => ids.has(value.choice))
+  const parsed = schema.safeParse(raw)
+  if (!parsed.success) return null
   return {
-    ...parsed,
-    ...(parsed.probabilities && {
-      probabilities: Object.fromEntries(Object.entries(parsed.probabilities).filter(([key]) => ids.has(key))),
+    ...parsed.data,
+    ...(parsed.data.probabilities && {
+      probabilities: Object.fromEntries(
+        Object.entries(parsed.data.probabilities).filter(([key]) => ids.has(key)),
+      ),
     }),
   }
 }
@@ -314,8 +319,8 @@ export async function askExecutor(
     const request = buildPickRequest(task, route, offered)
     assertApiKeyAbsent(request)
     const response = await client.systemOne(request)
-    const envelope = type({ '+': 'delete', answers: { '+': 'delete', executor: 'unknown' } })(response)
-    if (!(envelope instanceof type.errors)) answer = readChoice(envelope.answers.executor, offered)
+    const envelope = z.object({ answers: z.object({ executor: z.unknown() }) }).safeParse(response)
+    if (envelope.success) answer = readChoice(envelope.data.answers.executor, offered)
   } catch {
     failure = true
   }

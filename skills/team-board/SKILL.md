@@ -16,9 +16,9 @@ TOOLKIT="${DEREK_SKILLS:-$HOME/derek-skills}"
 node "$TOOLKIT/scripts/team-tasks.mjs" --help
 ```
 
-The scripts import `arktype` from the toolkit's `node_modules`. On a fresh
+The scripts import `zod` from the toolkit's `node_modules`. On a fresh
 checkout run `pnpm install` once in `$TOOLKIT` first; without it the command
-fails with `Cannot find package 'arktype'`.
+fails with `Cannot find package 'zod'`.
 
 ## Where the board lives
 

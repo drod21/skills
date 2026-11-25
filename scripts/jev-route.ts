@@ -21,7 +21,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { TypeSafeClient } from '@typesafe-ai/sdk'
-import { type } from 'arktype'
+import * as z from 'zod'
 
 import {
   askExecutor,
@@ -81,18 +81,20 @@ export function tagFlag(args: string[]) {
 
 /** --available <file> and every --unavailable <providerInstanceId[:model]>. Neither flag means all executors count. */
 export function availabilityFlags(args: string[]): Availability | undefined {
-  const flagValue = type('string > 0')
-    .pipe((text) => text.trim())
-    .narrow((text) => text.length > 0 && !text.startsWith('--'))
-  const fileValue = args.includes('--available') ? flagValue(flag(args, '--available')) : undefined
-  if (fileValue instanceof type.errors) throw new Error('--available needs a text value')
-  const file = fileValue
+  const flagValue = z
+    .string()
+    .min(1)
+    .transform((text) => text.trim())
+    .refine((text) => text.length > 0 && !text.startsWith('--'))
+  const fileValue = args.includes('--available') ? flagValue.safeParse(flag(args, '--available')) : undefined
+  if (fileValue && !fileValue.success) throw new Error('--available needs a text value')
+  const file = fileValue?.data
   const unavailable: string[] = []
   args.forEach((arg, index) => {
     if (arg !== '--unavailable') return
-    const value = flagValue(args[index + 1])
-    if (value instanceof type.errors) throw new Error('--unavailable needs a providerInstanceId[:model]')
-    unavailable.push(value)
+    const value = flagValue.safeParse(args[index + 1])
+    if (!value.success) throw new Error('--unavailable needs a providerInstanceId[:model]')
+    unavailable.push(value.data)
   })
   if (file === undefined && !unavailable.length) return undefined
   let available: Set<string> | undefined

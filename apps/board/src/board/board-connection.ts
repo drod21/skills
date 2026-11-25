@@ -1,7 +1,6 @@
 // The live connection, as plain code the hook starts and stops: it reads the board, listens for the server's `board`
 // events, and falls back to polling while the stream is down. It reports through `dispatch` only, so the page always
 // has a last good view to show whatever the network does.
-import { type } from 'arktype'
 import type { Dispatch } from 'react'
 import { fetchBoard } from './board-client'
 import { BoardEvent } from './board-contract'
@@ -67,8 +66,8 @@ export function connectBoard(filters: ServerFilters, dispatch: Dispatch<BoardAct
   })
   // After a reconnect the server says where the board is now; read again only if the page is behind.
   source.addEventListener('hello', (event) => {
-    const hello = BoardEvent(event.data)
-    if (hello instanceof type.errors || hello.revision !== lastRevision) void load()
+    const hello = BoardEvent.safeParse(event.data)
+    if (!hello.success || hello.data.revision !== lastRevision) void load()
   })
   source.addEventListener('board', () => void load())
 

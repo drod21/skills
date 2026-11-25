@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 import { choice, noul, score, type Question } from '@typesafe-ai/sdk'
-import { type } from 'arktype'
+import * as z from 'zod'
 
 import { cleanText } from './jev-guard.lib.ts'
 import { resolveBoardFile } from './team-board-path.mjs'
@@ -108,15 +108,19 @@ const BUILT_IN_RUBRICS = {
   },
 } as const satisfies Record<string, RubricText>
 
-const text = 'string > 0'
-const dimensionText = type({ '+': 'reject', question: text, levels: [text, text, text, text] })
-const rubricText = type({
-  '+': 'reject',
-  dimensions: { '+': 'reject', evidence: dimensionText, risk: dimensionText, cost: dimensionText, value: dimensionText },
-  noGood: { '+': 'reject', title: text, description: text, evidence: text },
-  anySound: { '+': 'reject', true: text, false: text },
+const text = z.string().min(1)
+const dimensionText = z.strictObject({ question: text, levels: z.tuple([text, text, text, text]) })
+const rubricText = z.strictObject({
+  dimensions: z.strictObject({
+    evidence: dimensionText,
+    risk: dimensionText,
+    cost: dimensionText,
+    value: dimensionText,
+  }),
+  noGood: z.strictObject({ title: text, description: text, evidence: text }),
+  anySound: z.strictObject({ true: text, false: text }),
 })
-const projectRubrics = type({ '[string]': rubricText })
+const projectRubrics = z.record(z.string(), rubricText)
 const RUBRIC_NAME = /^[a-z][a-z0-9_]{0,47}$/
 
 /**
@@ -131,11 +135,11 @@ export function loadProjectRubrics(file: string | null | undefined): Record<stri
   } catch (err) {
     throw new Error(`${file} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`)
   }
-  const parsed = projectRubrics(raw)
-  if (parsed instanceof type.errors) throw new Error(`${file} must map rubric names to rubrics: ${parsed.summary}`)
-  const badName = Object.keys(parsed).find((name) => !RUBRIC_NAME.test(name))
+  const parsed = projectRubrics.safeParse(raw)
+  if (!parsed.success) throw new Error(`${file} must map rubric names to rubrics: ${z.prettifyError(parsed.error)}`)
+  const badName = Object.keys(parsed.data).find((name) => !RUBRIC_NAME.test(name))
   if (badName !== undefined) throw new Error(`${file}: rubric ${JSON.stringify(badName)} must match ${RUBRIC_NAME}`)
-  return parsed
+  return parsed.data
 }
 
 /** TEAM_RUBRICS_FILE, else team-rubrics.json beside the board. */

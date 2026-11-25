@@ -1,4 +1,4 @@
-import { type } from 'arktype'
+import * as z from 'zod'
 import { describe, expect, it } from 'vitest'
 import raw from '../../tests/fixtures/view.json'
 import { BoardViewSchema } from './board-contract'
@@ -8,12 +8,12 @@ import { buildColumns, isKnownStatus } from './columns'
 function viewWith(change: (view: typeof raw) => void) {
   const view = structuredClone(raw)
   change(view)
-  return BoardViewSchema(view)
+  return BoardViewSchema.safeParse(view)
 }
 
 const parsed = (result: ReturnType<typeof viewWith>) => {
-  if (result instanceof type.errors) throw new Error(result.summary)
-  return result
+  if (!result.success) throw new Error(z.prettifyError(result.error))
+  return result.data
 }
 
 describe('a value the CLI adds after this app was built', () => {
@@ -69,7 +69,7 @@ describe('a value the CLI adds after this app was built', () => {
       const [row] = draft.needsOwner
       if (row) row.reasons = [{ why: 'question' }] as never
     })
-    expect(result instanceof type.errors).toBe(true)
+    expect(result.success).toBe(false)
   })
 
   it('keeps the known reasons exactly as they were sent', () => {

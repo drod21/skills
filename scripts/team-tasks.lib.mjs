@@ -24,7 +24,7 @@ import {
 import { randomBytes } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
-import { type } from 'arktype'
+import * as z from 'zod'
 import {
   assertEvidenceScope,
   evidenceContentId,
@@ -711,22 +711,21 @@ function assertAnswers(answers) {
 // means none was available or the route was held. A present executor must match the registry exactly
 // (scripts/jev-executors.catalog.mjs). A needs_lead verdict is refused before that match, so a held route
 // reports that it has no executor even when the object would also miss the registry.
-const executorSchema = type({
-  '+': 'reject',
-  id: 'string > 0',
-  providerInstanceId: 'string > 0',
-  model: 'string > 0',
-  options: type({ '[string]': 'string | number | boolean' }).narrow((value) => !Array.isArray(value)),
-  source: "'jev' | 'default'",
+const executorSchema = z.strictObject({
+  id: z.string().min(1),
+  providerInstanceId: z.string().min(1),
+  model: z.string().min(1),
+  options: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
+  source: z.enum(['jev', 'default']),
 })
 
 function storedExecutor(executor, route) {
   if (executor === undefined) return {}
   if (executor === null) return { executor: null }
   if (route === 'needs_lead') jevError('a needs_lead verdict has no executor')
-  const parsed = executorSchema(executor)
-  if (parsed instanceof type.errors) jevError('invalid executor')
-  const matched = matchStoredExecutor(parsed, route)
+  const parsed = executorSchema.safeParse(executor)
+  if (!parsed.success) jevError('invalid executor')
+  const matched = matchStoredExecutor(parsed.data, route)
   if (!matched.ok) jevError(matched.message)
   return { executor: matched.executor }
 }
@@ -1674,7 +1673,7 @@ export function reviewReport(task) {
   }
 }
 
-/** @param {import('./team-review.mjs').reviewSchema.infer} review */
+/** @param {import('./team-review.mjs').ReviewBody} review */
 export function recordReview(board, id, review, by) {
   const task = findLiveTask(board, id)
   refuseFinished(task, 'review')
@@ -1917,25 +1916,32 @@ function refuseQuestion(task, id, want, verb) {
   if (question !== want) throw new Error(`task ${id} has question state ${question}; ${verb} needs ${want}`)
 }
 
+const nonEmpty = z.string().min(1)
 const packetFields = {
-  '+': 'reject',
-  area: 'string > 0',
-  lead: 'string > 0',
-  priority: "'urgent' | 'blocked' | 'review' | 'idea'",
-  priorityReason: 'string > 0',
-  recommendation: 'string > 0',
-  scope: 'string > 0',
-  alternatives: 'string[]',
-  checks: 'string[]',
+  area: nonEmpty,
+  lead: nonEmpty,
+  priority: z.enum(['urgent', 'blocked', 'review', 'idea']),
+  priorityReason: nonEmpty,
+  recommendation: nonEmpty,
+  scope: nonEmpty,
+  alternatives: z.array(z.string()),
+  checks: z.array(z.string()),
 }
-const reviewPacketSchema = type.or(
-  { ...packetFields, kind: "'decision' | 'idea'" },
-  { ...packetFields, kind: "'product'", candidate: 'string > 0', screenshots: 'string[] > 0', 'video?': 'string > 0' },
-)
+const reviewPacketSchema = z.union([
+  z.strictObject({ ...packetFields, kind: z.enum(['decision', 'idea']) }),
+  z.strictObject({
+    ...packetFields,
+    kind: z.literal('product'),
+    candidate: nonEmpty,
+    screenshots: z.array(z.string()).min(1),
+    video: nonEmpty.exactOptional(),
+  }),
+])
 
 export function parseReviewPacket(raw) {
-  const packet = reviewPacketSchema(raw)
-  if (packet instanceof type.errors) throw new Error(`invalid review packet: ${packet.summary}`)
+  const parsed = reviewPacketSchema.safeParse(raw)
+  if (!parsed.success) throw new Error(`invalid review packet: ${z.prettifyError(parsed.error)}`)
+  const packet = parsed.data
   cleanText(JSON.stringify(packet), 'review packet')
   if (
     packet.kind === 'product' &&

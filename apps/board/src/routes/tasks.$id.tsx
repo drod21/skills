@@ -1,16 +1,17 @@
 // The place a card opens: the task's thread, where the owner reads what was said and sends a note or an answer.
 import { createFileRoute, notFound } from '@tanstack/react-router'
-import { type } from 'arktype'
+import * as z from 'zod'
+import { positiveIntegerText } from '../schema'
 import { TaskThread } from '../thread/TaskThread'
 
-const TaskParams = type({ id: 'string.integer.parse' }).to({ id: 'number.integer > 0' })
+const TaskParams = z.object({ id: positiveIntegerText })
 
 export const Route = createFileRoute('/tasks/$id')({
   params: {
     parse: (raw) => {
-      const parsed = TaskParams(raw)
-      if (parsed instanceof type.errors) throw notFound()
-      return parsed
+      const parsed = TaskParams.safeParse(raw)
+      if (!parsed.success) throw notFound()
+      return parsed.data
     },
     stringify: ({ id }) => ({ id: String(id) }),
   },

@@ -3,26 +3,29 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { join, resolve } from 'node:path'
 
-import { type } from 'arktype'
+import * as z from 'zod'
 
 import { launchJevCli, readJevInput, runBatch, validateJevText, type BatchInput, type JevClient } from './jev-batch.ts'
 
-export const selectionSchema = type({
-  mode: "'filter' | 'compact'",
-  goal: '0 < string <= 4000',
-  'summary?': '0 < string <= 8000',
-  sections: type({
-    id: '0 < string <= 100',
-    source: '0 < string <= 1000',
-    offset: 'number.integer >= 0',
-    text: '0 < string <= 1000000',
-    'pinned?': 'boolean',
-  })
-    .array()
-    .atLeastLength(1)
-    .atMostLength(500),
+const bounded = (max: number) => z.string().min(1).max(max)
+export const selectionSchema = z.object({
+  mode: z.enum(['filter', 'compact']),
+  goal: bounded(4000),
+  summary: bounded(8000).exactOptional(),
+  sections: z
+    .array(
+      z.object({
+        id: bounded(100),
+        source: bounded(1000),
+        offset: z.number().int().nonnegative(),
+        text: bounded(1000000),
+        pinned: z.boolean().exactOptional(),
+      }),
+    )
+    .min(1)
+    .max(500),
 })
-export type SelectionInput = typeof selectionSchema.infer
+export type SelectionInput = z.infer<typeof selectionSchema>
 
 export async function selectEvidence(input: SelectionInput, out: string, client?: JevClient) {
   const seen = new Set<string>()
@@ -111,7 +114,7 @@ export async function selectionMain(argv = process.argv.slice(2), client?: JevCl
   const [file, flag, out] = argv
   if (!file || flag !== '--out' || !out || argv.length !== 3)
     throw new Error('usage: node scripts/jev-select.ts input.json --out artifact-directory')
-  const result = await selectEvidence(readJevInput(file, selectionSchema.assert), out, client)
+  const result = await selectEvidence(readJevInput(file, (value) => selectionSchema.parse(value)), out, client)
   console.log(JSON.stringify(result))
   return result.outcome === 'answered' ? 0 : result.outcome === 'rejected' ? 2 : 3
 }

@@ -3,28 +3,29 @@ import { writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { join, resolve } from 'node:path'
 
-import { type } from 'arktype'
+import * as z from 'zod'
 
 import { hashRequest } from './jev-ask.lib.ts'
 import { launchJevCli, readJevInput, runBatch, type JevClient } from './jev-batch.ts'
 
-const control = type({ id: '0 < string <= 100', description: '0 < string <= 500', action: '0 < string <= 500' })
-const observationSchema = type({
-  surface: "'browser' | 'simulator' | 'emulator'",
-  identity: '0 < string <= 500',
-  state: '0 < string <= 5000',
-  controls: control.array().atMostLength(3),
+const bounded = (max: number) => z.string().min(1).max(max)
+const control = z.object({ id: bounded(100), description: bounded(500), action: bounded(500) })
+const observationSchema = z.object({
+  surface: z.enum(['browser', 'simulator', 'emulator']),
+  identity: bounded(500),
+  state: bounded(5000),
+  controls: z.array(control).max(3),
 })
-const historySchema = type({ fingerprint: 'string', control: control, receipt: 'string' }).array()
-export const uiSchema = type({
-  goal: '0 < string <= 3000',
-  maxActions: '1 <= number.integer <= 50',
+const historySchema = z.array(z.object({ fingerprint: z.string(), control, receipt: z.string() }))
+export const uiSchema = z.object({
+  goal: bounded(3000),
+  maxActions: z.number().int().min(1).max(50),
   observation: observationSchema,
   history: historySchema,
 })
-export type UiInput = typeof uiSchema.infer
-export type UiObservation = typeof observationSchema.infer
-type Control = typeof control.infer
+export type UiInput = z.infer<typeof uiSchema>
+export type UiObservation = z.infer<typeof observationSchema>
+type Control = z.infer<typeof control>
 type TerminalStatus = 'complete' | 'blocked' | 'ambiguous' | 'hold' | 'max_actions' | 'stuck' | 'stale'
 type UiBase = { history: UiInput['history']; observation: UiObservation; receipt: string | null }
 export type UiStep = UiBase & ({ status: TerminalStatus } | { status: 'action'; action: Control; fingerprint: string })
@@ -65,7 +66,7 @@ async function chooseControl(input: UiInput, context: string, out: string, clien
 }
 
 export async function nextUiStep(raw: unknown, out: string, client?: JevClient): Promise<UiStep> {
-  const input = uiSchema.assert(raw)
+  const input = uiSchema.parse(raw)
   const fingerprint = hashRequest(input.observation)
   const context = JSON.stringify({ goal: input.goal, observation: input.observation, recent: input.history.slice(-3) })
   if (context.length > 12000) throw new Error('UI state exceeds the request budget; narrow the observation')
@@ -97,7 +98,7 @@ export async function nextUiStep(raw: unknown, out: string, client?: JevClient):
     observation: input.observation,
   })
   if (status.result.outcome === 'hold') return finish('hold', status.receipt)
-  const state = type("'complete' | 'continue' | 'blocked' | 'ambiguous'").assert(status.result.answer)
+  const state = z.enum(['complete', 'continue', 'blocked', 'ambiguous']).parse(status.result.answer)
   if (state !== 'continue') return finish(state, status.receipt)
   const stop = stopReason(input, fingerprint)
   if (stop) return finish(stop, status.receipt)
@@ -123,10 +124,10 @@ export async function runUiFlow(
 ) {
   let history: UiInput['history'] = []
   for (;;) {
-    const observation = observationSchema.assert(await adapter.observe())
+    const observation = observationSchema.parse(await adapter.observe())
     const next = await nextUiStep({ goal, maxActions, observation, history }, out, client)
     if (next.status !== 'action') return next
-    const current = observationSchema.assert(await adapter.observe())
+    const current = observationSchema.parse(await adapter.observe())
     if (hashRequest(current) !== next.fingerprint) return { ...next, status: 'stale' }
     await adapter.act(next.action, observation)
     history = next.history
@@ -137,7 +138,7 @@ export async function uiMain(argv = process.argv.slice(2), client?: JevClient) {
   const [file, flag, out] = argv
   if (!file || flag !== '--out' || !out || argv.length !== 3)
     throw new Error('usage: node scripts/jev-ui.ts observation.json --out artifact-directory')
-  const result = await nextUiStep(readJevInput(file, uiSchema.assert), out, client)
+  const result = await nextUiStep(readJevInput(file, (value) => uiSchema.parse(value)), out, client)
   const artifact = join(resolve(out), `ui-${randomUUID()}.json`)
   writeFileSync(artifact, JSON.stringify(result, null, 2), { flag: 'wx' })
   console.log(JSON.stringify({ ...result, artifact }))

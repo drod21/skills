@@ -1,11 +1,13 @@
 packages:
   - apps/*
 
+# esbuild's postinstall only checks a prebuilt binary. Leave it off; the optional
+# platform package already supplies the binary.
+allowBuilds:
+  esbuild: false
+
 # Agent skills shipped by dependencies (pnpm >= 12.11).
 # https://pnpm.io/agent-skills
-permissions:
-  arktype:
-    skills: true
 skills:
   dirs:
     - .agents/skills

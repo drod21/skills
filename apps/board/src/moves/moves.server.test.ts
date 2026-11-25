@@ -87,7 +87,7 @@ describe('lookupOf', () => {
   })
 
   it('shows a command this app does not run as unavailable, and never offers it', () => {
-    const unknown = parseCliMoves(
+    const unknown = parseCliMoves.parse(
       JSON.stringify({
         version: 1,
         id: 4,

@@ -2,7 +2,7 @@
 // CLI what that move is right now (`moves <id>`), checks the card is the one the owner looked at, builds the argument
 // array itself and runs it through the same bridge that reads the view. A command name or an argument list from the
 // browser is never read: the schema for the request has no place to put one.
-import { type } from 'arktype'
+import * as z from 'zod'
 import { decideAccess, refusal } from '../server/access.server'
 import type { Config } from '../server/board-config.server'
 import { CLI_TIMEOUT_MS, spawnCli, type Outcome } from '../server/board-cli.server'
@@ -10,6 +10,7 @@ import { kickDelivery } from '../server/delivery.server'
 import { jsonResponse } from '../server/json-response.server'
 import { badRequest, guardWrite } from '../server/write-guard.server'
 import type { BoardFailure } from '../board/board-contract'
+import { jsonParsed, positiveIntegerText } from '../schema'
 import {
   MAX_INPUT_LENGTH,
   MoveRequestSchema,
@@ -40,18 +41,18 @@ const withFailure = (failure: BoardFailure): Outcome<never> => ({ ok: false, fai
 export async function readMoves(config: MovesDeps['config'], id: number, by: string): Promise<Outcome<CliMoves>> {
   const spawned = await spawnCli(config, ['moves', String(id), '--by', by], CLI_TIMEOUT_MS)
   if (spawned.failure) return withFailure(spawned.failure)
-  const parsed = parseCliMoves(spawned.stdout)
-  if (!(parsed instanceof type.errors)) return { ok: true, value: parsed }
-  const probe = type('string.json.parse').pipe(type({ version: 'number' }))(spawned.stdout)
-  if (!(probe instanceof type.errors) && probe.version !== SUPPORTED_MOVES_VERSION) {
+  const parsed = parseCliMoves.safeParse(spawned.stdout)
+  if (parsed.success) return { ok: true, value: parsed.data }
+  const probe = jsonParsed(z.object({ version: z.number() })).safeParse(spawned.stdout)
+  if (probe.success && probe.data.version !== SUPPORTED_MOVES_VERSION) {
     return withFailure({
       kind: 'version',
-      message: `the board CLI answers moves version ${probe.version}; this app reads version ${SUPPORTED_MOVES_VERSION}`,
+      message: `the board CLI answers moves version ${probe.data.version}; this app reads version ${SUPPORTED_MOVES_VERSION}`,
     })
   }
   return withFailure({
     kind: 'output',
-    message: `the board CLI printed moves this app cannot read: ${parsed.summary}`,
+    message: `the board CLI printed moves this app cannot read: ${z.prettifyError(parsed.error)}`,
   })
 }
 
@@ -193,17 +194,17 @@ const STATUS_OF: Record<MoveFailureKind, number> = {
   unavailable: 502,
 }
 
-const IdParam = type('string.integer.parse').to('number.integer > 0')
+const IdParam = positiveIntegerText
 
 /** `GET /api/moves/<id>`: what the card can do now. Reads need access only. */
 export async function handleLookup(request: Request, rawId: string, deps: MovesDeps): Promise<Response> {
   const access = decideAccess({ headers: request.headers, port: deps.config.port, tailnet: deps.config.tailnet })
   if (!access.ok) return refusal(access)
-  const id = IdParam(rawId)
-  if (id instanceof type.errors) {
+  const id = IdParam.safeParse(rawId)
+  if (!id.success) {
     return jsonResponse({ ok: false, failure: { kind: 'refused', message: 'That is not a task id.' } }, 400)
   }
-  const looked = await readMoves(deps.config, id, access.actor)
+  const looked = await readMoves(deps.config, id.data, access.actor)
   return looked.ok
     ? jsonResponse({ ok: true, moves: lookupOf(looked.value) })
     : jsonResponse({ ok: false, failure: looked.failure }, looked.failure.kind === 'refused' ? 409 : 502)
@@ -216,11 +217,11 @@ export async function handleLookup(request: Request, rawId: string, deps: MovesD
  */
 export function handleMove(request: Request, rawId: string, deps: MovesDeps): Promise<Response> {
   return guardWrite(request, deps, async ({ actor, body }) => {
-    const id = IdParam(rawId)
-    if (id instanceof type.errors) return badRequest('That is not a task id.')
-    const parsed = MoveRequestSchema(body)
-    if (parsed instanceof type.errors) return badRequest(parsed.summary)
-    const outcome = await runMove(deps.config, actor, id, parsed)
+    const id = IdParam.safeParse(rawId)
+    if (!id.success) return badRequest('That is not a task id.')
+    const parsed = MoveRequestSchema.safeParse(body)
+    if (!parsed.success) return badRequest(z.prettifyError(parsed.error))
+    const outcome = await runMove(deps.config, actor, id.data, parsed.data)
     return jsonResponse(outcome, outcome.ok ? 200 : STATUS_OF[outcome.kind])
   })
 }

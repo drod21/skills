@@ -102,15 +102,15 @@ const journal = () => cliJson<Journal>(file, ['show', String(taskId)])
 const entries = () => journal().decisions ?? []
 
 async function outcome(response: Response) {
-  const parsed = parseWriteEnvelope(await response.text())
-  if ('summary' in parsed) throw new Error('not a write envelope')
-  return parsed
+  const parsed = parseWriteEnvelope.safeParse(await response.text())
+  if (!parsed.success) throw new Error('not a write envelope')
+  return parsed.data
 }
 
 async function readThread() {
-  const parsed = parseThreadEnvelope(await (await threadResponse(String(taskId), deps)).text())
-  if ('summary' in parsed || !parsed.ok) throw new Error('thread unreadable')
-  return parsed.thread
+  const parsed = parseThreadEnvelope.safeParse(await (await threadResponse(String(taskId), deps)).text())
+  if (!parsed.success || !parsed.data.ok) throw new Error('thread unreadable')
+  return parsed.data.thread
 }
 
 const send = (body: unknown, headers?: Record<string, string>) =>

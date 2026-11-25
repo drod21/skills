@@ -11,6 +11,7 @@ import { execFile } from 'node:child_process'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
+import * as z from 'zod'
 
 import { TIER_EXECUTORS } from './jev-executors.catalog.mjs'
 
@@ -70,13 +71,23 @@ import {
   settleSweep,
 } from './team-board-delivery.mjs'
 
-// arktype compiles its validators at import, which adds ~90ms to every spawn. Only the check-* commands need it,
-// so load it on demand instead of for every board command.
-async function parseCheckArgs(raw, shape) {
-  const { type } = await import('arktype')
-  const value = type(shape)(JSON.parse(raw))
-  if (value instanceof type.errors) throw new Error(value.summary)
-  return value
+const checkStartArgs = z.object({
+  by: z.string(),
+  token: z.string(),
+  evidence: z.array(z.string()),
+  basis: z.number().int().nonnegative(),
+  scope: z.unknown().exactOptional(),
+})
+const checkAbandonArgs = z.object({
+  by: z.string(),
+  token: z.string(),
+  basis: z.number().int().nonnegative(),
+})
+
+function parseCheckArgs(raw, schema) {
+  const value = schema.safeParse(JSON.parse(raw))
+  if (!value.success) throw new Error(z.prettifyError(value.error))
+  return value.data
 }
 
 const USAGE = [
@@ -320,7 +331,7 @@ function t3Binary() {
   return existsSync(installed) ? installed : 't3'
 }
 
-function t3Ids(type, reply, stdout) {
+function t3Ids(reply, stdout) {
   const text = stdout.trim()
   if (!text) return {}
   let raw
@@ -329,11 +340,11 @@ function t3Ids(type, reply, stdout) {
   } catch {
     return {}
   }
-  const parsed = reply(raw)
-  if (parsed instanceof type.errors) return {}
+  const parsed = reply.safeParse(raw)
+  if (!parsed.success) return {}
   const ids = {}
-  if (parsed.messageId) ids.messageId = parsed.messageId
-  if (parsed.runId) ids.runId = parsed.runId
+  if (parsed.data.messageId) ids.messageId = parsed.data.messageId
+  if (parsed.data.runId) ids.runId = parsed.data.runId
   return ids
 }
 
@@ -392,9 +403,15 @@ async function probeThread(bin, id, timeoutMs, readReply) {
 }
 
 // Asks T3 about every current wake thread on the board, one at a time. Read-only. Returns `{threadId: probe}`.
+const threadShowReply = z.object({
+  thread: z.object({
+    status: z.string(),
+    activeRunId: z.string().nullable().exactOptional(),
+    updatedAt: z.string().exactOptional(),
+  }),
+})
+
 async function probeRuns(board) {
-  const { type } = await import('arktype')
-  const reply = type({ thread: { status: 'string', 'activeRunId?': 'string | null', 'updatedAt?': 'string' } })
   const readReply = (stdout) => {
     let raw
     try {
@@ -402,8 +419,8 @@ async function probeRuns(board) {
     } catch {
       return null
     }
-    const parsed = reply(raw)
-    return parsed instanceof type.errors ? null : parsed
+    const parsed = threadShowReply.safeParse(raw)
+    return parsed.success ? parsed.data : null
   }
   const bin = t3Binary()
   const timeoutMs = boardT3Timeout(RUNS_TIMEOUT_MS)
@@ -412,16 +429,19 @@ async function probeRuns(board) {
   return probes
 }
 
+const sendReply = z.object({
+  messageId: z.string().exactOptional(),
+  runId: z.string().exactOptional(),
+})
+
 async function sendJobs(bin, jobs, timeoutMs, settle) {
-  const { type } = await import('arktype')
-  const reply = type({ 'messageId?': 'string', 'runId?': 'string' })
   for (const job of jobs) {
     const outcome = await sendOne(bin, job, timeoutMs)
     if (!outcome.ok) {
       settle(outcome)
       continue
     }
-    settle({ ...outcome, ...t3Ids(type, reply, outcome.stdout) })
+    settle({ ...outcome, ...t3Ids(sendReply, outcome.stdout) })
   }
 }
 
@@ -532,13 +552,7 @@ const COMMANDS = {
   },
   async 'check-start'(file, args) {
     const id = requireId(args)
-    const value = await parseCheckArgs(args[1], {
-      by: 'string',
-      token: 'string',
-      evidence: 'string[]',
-      basis: 'number.integer >= 0',
-      'scope?': 'unknown',
-    })
+    const value = parseCheckArgs(args[1], checkStartArgs)
     out(withBoard(file, (board) => startEvidenceCheck(board, id, value)))
   },
   'check-end'(file, args) {
@@ -548,7 +562,7 @@ const COMMANDS = {
   },
   async 'check-abandon'(file, args) {
     const id = requireId(args)
-    const value = await parseCheckArgs(args[1], { by: 'string', token: 'string', basis: 'number.integer >= 0' })
+    const value = parseCheckArgs(args[1], checkAbandonArgs)
     out(withBoard(file, (board) => abandonStaleEvidenceCheck(board, id, value)))
   },
   async review(file, args) {

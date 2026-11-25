@@ -5,26 +5,30 @@ import { basename, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { TypeSafeClient, type Questions, type SystemOneRequest } from '@typesafe-ai/sdk'
-import { type } from 'arktype'
+import * as z from 'zod'
 
 import { buildAskRequest, hashRequest, readAsk, type AskOutcome } from './jev-ask.lib.ts'
 import { assertApiKeyAbsent, cleanText, redactApiKey, secretFileReason, secretInText } from './jev-guard.lib.ts'
 
-const text = type('0 < string <= 12000')
-const id = type('string').matching(/^[a-z][a-z0-9_]{0,47}$/)
-const ask = type({ kind: "'yes_no'", question: '0 < string <= 300' }).or({
-  kind: "'pick'",
-  question: '0 < string <= 300',
-  labels: { '[string]': '0 < string <= 300' },
-})
-export const batchSchema = type({
+const text = z.string().min(1).max(12000)
+const id = z.string().regex(/^[a-z][a-z0-9_]{0,47}$/)
+const question = z.string().min(1).max(300)
+const ask = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('yes_no'), question }),
+  z.object({
+    kind: z.literal('pick'),
+    question,
+    labels: z.record(z.string(), question),
+  }),
+])
+export const batchSchema = z.object({
   context: text,
-  items: type({ id, context: 'string <= 6000', ask }).array().atLeastLength(1).atMostLength(1000),
+  items: z.array(z.object({ id, context: z.string().max(6000), ask })).min(1).max(1000),
 })
-export type BatchInput = typeof batchSchema.infer
+export type BatchInput = z.infer<typeof batchSchema>
 export type JevClient = { systemOne: (request: SystemOneRequest<Questions>) => PromiseLike<{ answers: unknown }> }
 export type BatchResult = { id: string; receipt: string; requestHash: string; result: AskOutcome }
-const cellsSchema = type({ '[string]': 'unknown' })
+const cellsSchema = z.record(z.string(), z.unknown())
 const MAX_REQUEST_CHARS = 24000
 const MAX_QUESTIONS = 24
 
@@ -93,7 +97,7 @@ export async function runBatch(
   out: string,
   client: JevClient = new TypeSafeClient({ defaultModel: 'jev-latest' }),
 ): Promise<BatchResult[]> {
-  const input = batchSchema.assert(raw)
+  const input = batchSchema.parse(raw)
   const chunks = batchRequests(input)
   for (const { request } of chunks) assertApiKeyAbsent(request)
   mkdirSync(out, { recursive: true })
@@ -105,7 +109,7 @@ export async function runBatch(
     let error: string | null = null
     try {
       const response = await client.systemOne(request)
-      answers = cellsSchema.assert(response.answers)
+      answers = cellsSchema.parse(response.answers)
     } catch (cause) {
       error = redactApiKey(cause instanceof Error ? cause.message : String(cause))
     }
@@ -124,7 +128,7 @@ export async function batchMain(argv = process.argv.slice(2), client?: JevClient
   const [file, flag, out] = argv
   if (!file || flag !== '--out' || !out || argv.length !== 3)
     throw new Error('usage: node scripts/jev-batch.ts input.json --out artifact-directory')
-  const input = readJevInput(file, batchSchema.assert)
+  const input = readJevInput(file, (value) => batchSchema.parse(value))
   const results = await runBatch(input, out, client)
   console.log(
     JSON.stringify({ outcome: results.some((r) => r.result.outcome === 'hold') ? 'hold' : 'answered', results }),

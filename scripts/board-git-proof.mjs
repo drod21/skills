@@ -1,29 +1,33 @@
 import { execFileSync } from 'node:child_process'
 import { isAbsolute } from 'node:path'
 import { realpathSync } from 'node:fs'
-import { type } from 'arktype'
+import * as z from 'zod'
 
-const oid = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/
-const ci = type({
-  '+': 'reject',
-  repository: /^[A-Za-z0-9][A-Za-z0-9-]*\/(?=[A-Za-z0-9_.-]*[A-Za-z0-9])[A-Za-z0-9_.-]+$/,
-  workflow: 'number.integer > 0',
-  workflowPath: /^\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/,
+const oid = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/)
+const ci = z.strictObject({
+  repository: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9-]*\/(?=[A-Za-z0-9_.-]*[A-Za-z0-9])[A-Za-z0-9_.-]+$/),
+  workflow: z.number().int().positive(),
+  workflowPath: z.string().regex(/^\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/),
   workflowCommit: oid,
-  run: 'number.integer > 0',
-  attempt: 'number.integer > 0',
-  job: 'string > 0',
-  step: 'string > 0',
-  'on?': "'candidate' | 'landed'",
+  run: z.number().int().positive(),
+  attempt: z.number().int().positive(),
+  job: z.string().min(1),
+  step: z.string().min(1),
+  on: z.enum(['candidate', 'landed']).exactOptional(),
 })
-const head = { '+': 'reject', repo: 'string', candidate: oid, 'ci?': ci }
-const proofSchema = type.or(
-  head,
-  { ...head, base: oid, landed: oid, target: /^refs\/(?:heads|remotes)\/[A-Za-z0-9._/-]+$/ },
-)
+const head = { repo: z.string(), candidate: oid, ci: ci.exactOptional() }
+const proofSchema = z.union([
+  z.strictObject(head),
+  z.strictObject({
+    ...head,
+    base: oid,
+    landed: oid,
+    target: z.string().regex(/^refs\/(?:heads|remotes)\/[A-Za-z0-9._/-]+$/),
+  }),
+])
 
 export function normalizeGitProof(value) {
-  const proof = proofSchema.assert(value)
+  const proof = proofSchema.parse(value)
   if (!isAbsolute(proof.repo)) throw new Error('Git proof needs an absolute repository root')
   if (proof.ci?.on === 'landed' && !('landed' in proof))
     throw new Error('CI proof on the landed commit needs a squash proof')

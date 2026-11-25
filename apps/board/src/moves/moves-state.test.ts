@@ -1,4 +1,4 @@
-import { type } from 'arktype'
+import * as z from 'zod'
 import { describe, expect, it } from 'vitest'
 import raw from '../../tests/fixtures/view.json'
 import { BoardViewSchema, type BoardCard, type BoardView } from '../board/board-contract'
@@ -16,9 +16,9 @@ import {
   type Pending,
 } from './moves-state'
 
-const checked = BoardViewSchema(structuredClone(raw))
-if (checked instanceof type.errors) throw new Error(checked.summary)
-const parsed: BoardView = checked
+const checked = BoardViewSchema.safeParse(structuredClone(raw))
+if (!checked.success) throw new Error(z.prettifyError(checked.error))
+const parsed: BoardView = checked.data
 const base: BoardCard = parsed.tasks[0] ?? parsed.closed.tasks[0]!
 
 const card = (id: number, status: string, change: Partial<BoardCard> = {}): BoardCard => ({

@@ -1,6 +1,5 @@
-// The browser's side of the thread routes. Reads are parsed with arktype; a write carries this process's token
+// The browser's side of the thread routes. Reads are parsed with zod; a write carries this process's token
 // (from /api/session) and says only what the owner typed: the server signs the write with the owner's name.
-import { type } from 'arktype'
 import { fetchSession } from '../board/board-client'
 import type { BoardFailure } from '../board/board-contract'
 import {
@@ -25,10 +24,10 @@ const network = (message: string): { ok: false; failure: BoardFailure } => ({
 export async function fetchThread(id: number, signal: AbortSignal): Promise<ThreadResult> {
   try {
     const response = await fetch(`/api/thread/${id}`, { signal, headers: { accept: 'application/json' } })
-    const parsed = parseThreadEnvelope(await response.text())
-    if (parsed instanceof type.errors)
+    const parsed = parseThreadEnvelope.safeParse(await response.text())
+    if (!parsed.success)
       return network(`the server answered ${response.status} with something that is not a thread`)
-    return parsed.ok ? { ok: true, thread: parsed.thread } : parsed
+    return parsed.data.ok ? { ok: true, thread: parsed.data.thread } : parsed.data
   } catch (error) {
     if (signal.aborted) throw error
     return network('the board server cannot be reached')
@@ -38,10 +37,10 @@ export async function fetchThread(id: number, signal: AbortSignal): Promise<Thre
 export async function fetchThreadList(signal: AbortSignal): Promise<ListResult> {
   try {
     const response = await fetch('/api/thread/threads', { signal, headers: { accept: 'application/json' } })
-    const parsed = parseThreadList(await response.text())
-    if (parsed instanceof type.errors)
+    const parsed = parseThreadList.safeParse(await response.text())
+    if (!parsed.success)
       return network(`the server answered ${response.status} with something that is not a thread list`)
-    return parsed
+    return parsed.data
   } catch (error) {
     if (signal.aborted) throw error
     return network('the board server cannot be reached')
@@ -71,12 +70,12 @@ async function post(path: string, body: unknown): Promise<WriteResult> {
       headers: { 'content-type': 'application/json', accept: 'application/json', [TOKEN_HEADER]: key },
       body: JSON.stringify(body),
     })
-    const parsed = parseWriteEnvelope(await response.text())
-    if (parsed instanceof type.errors)
+    const parsed = parseWriteEnvelope.safeParse(await response.text())
+    if (!parsed.success)
       return network(`the server answered ${response.status} with something this page cannot read`)
     // 403 is a stale token (the server restarted): ask for a fresh one next time.
-    if (!parsed.ok && response.status === 403) forgetToken()
-    return parsed
+    if (!parsed.data.ok && response.status === 403) forgetToken()
+    return parsed.data
   } catch {
     return network('the board server cannot be reached, so nothing was sent')
   }

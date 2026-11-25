@@ -1,39 +1,42 @@
 // The only module that runs the board CLI. It spawns `node <cli> view ...` with an argument array (no shell) and a
-// bounded time, and parses the JSON with arktype before anything inward sees it. Nothing else in the app
+// bounded time, and parses the JSON with zod before anything inward sees it. Nothing else in the app
 // touches the CLI or the board file.
 import { execFile } from 'node:child_process'
-import { type } from 'arktype'
+import * as z from 'zod'
 import { BoardViewSchema, SUPPORTED_VIEW_VERSION } from '../board/board-contract'
 import type { BoardFailure, BoardView } from '../board/board-contract'
 import type { Config } from './board-config.server'
+import { integerTextIn, jsonParsed } from '../schema'
 
 /** The CLI reads 1,500 tasks in about 0.15 s; this is the room for a loaded Mac, not a target. */
 export const CLI_TIMEOUT_MS = 20_000
 const MAX_OUTPUT_BYTES = 64 * 1024 * 1024
 export const MAX_CLOSED_LIMIT = 200
 
+const bounded = (max: number) => z.string().min(1).max(max)
+
 /** The filters and page the page may ask for, as they arrive in a query string. */
-export const BoardQuerySchema = type({
-  'role?': 'string > 0 & string <= 200',
-  'tag?': 'string > 0 & string <= 200',
-  'owner?': 'string > 0 & string <= 500',
-  'closedLimit?': type('string.integer.parse').to(`1 <= number.integer <= ${MAX_CLOSED_LIMIT}`),
-  'closedBefore?': /^(-?\d+|none):\d+$/,
+export const BoardQuerySchema = z.object({
+  role: bounded(200).exactOptional(),
+  tag: bounded(200).exactOptional(),
+  owner: bounded(500).exactOptional(),
+  closedLimit: integerTextIn(1, MAX_CLOSED_LIMIT).exactOptional(),
+  closedBefore: z.string().regex(/^(-?\d+|none):\d+$/).exactOptional(),
 })
-export type BoardQuery = typeof BoardQuerySchema.infer
+export type BoardQuery = z.infer<typeof BoardQuerySchema>
 
 export type Outcome<T> = { ok: true; value: T } | { ok: false; failure: BoardFailure }
 
 /** Read a query string into a BoardQuery, or say what is wrong with it. */
 export function parseBoardQuery(params: URLSearchParams): Outcome<BoardQuery> {
-  const parsed = BoardQuerySchema(Object.fromEntries(params))
-  return parsed instanceof type.errors
-    ? { ok: false, failure: { kind: 'refused', message: parsed.summary } }
-    : { ok: true, value: parsed }
+  const parsed = BoardQuerySchema.safeParse(Object.fromEntries(params))
+  return parsed.success
+    ? { ok: true, value: parsed.data }
+    : { ok: false, failure: { kind: 'refused', message: z.prettifyError(parsed.error) } }
 }
 
-const ParsedView = type('string.json.parse').pipe(BoardViewSchema)
-const VersionProbe = type('string.json.parse').pipe(type({ version: 'number' }))
+const ParsedView = jsonParsed(BoardViewSchema)
+const VersionProbe = jsonParsed(z.object({ version: z.number() }))
 
 /** `view`'s arguments for a query, in a fixed order. A flag the query leaves out is not passed. */
 export function viewArgs(query: BoardQuery): string[] {
@@ -95,21 +98,21 @@ const inflight = new Map<string, Promise<Outcome<BoardView>>>()
 async function readView(config: Pick<Config, 'cli' | 'boardFile' | 'node'>, query: BoardQuery, timeoutMs: number) {
   const spawned = await spawnCli(config, viewArgs(query), timeoutMs)
   if (spawned.failure) return { ok: false, failure: spawned.failure } satisfies Outcome<BoardView>
-  const parsed = ParsedView(spawned.stdout)
-  if (!(parsed instanceof type.errors)) return { ok: true, value: parsed } satisfies Outcome<BoardView>
-  const probe = VersionProbe(spawned.stdout)
-  if (!(probe instanceof type.errors) && probe.version !== SUPPORTED_VIEW_VERSION) {
+  const parsed = ParsedView.safeParse(spawned.stdout)
+  if (parsed.success) return { ok: true, value: parsed.data } satisfies Outcome<BoardView>
+  const probe = VersionProbe.safeParse(spawned.stdout)
+  if (probe.success && probe.data.version !== SUPPORTED_VIEW_VERSION) {
     return {
       ok: false,
       failure: {
         kind: 'version',
-        message: `the board CLI answers view version ${probe.version}; this app reads version ${SUPPORTED_VIEW_VERSION}`,
+        message: `the board CLI answers view version ${probe.data.version}; this app reads version ${SUPPORTED_VIEW_VERSION}`,
       },
     } satisfies Outcome<BoardView>
   }
   return {
     ok: false,
-    failure: { kind: 'output', message: `the board CLI printed a view this app cannot read: ${parsed.summary}` },
+    failure: { kind: 'output', message: `the board CLI printed a view this app cannot read: ${z.prettifyError(parsed.error)}` },
   } satisfies Outcome<BoardView>
 }
 

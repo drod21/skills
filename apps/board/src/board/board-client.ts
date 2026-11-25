@@ -1,5 +1,4 @@
-// The browser's side of the two read routes. Every response is parsed with arktype before the page uses it.
-import { type } from 'arktype'
+// The browser's side of the two read routes. Every response is parsed with zod before the page uses it.
 import { parseBoardEnvelope, parseSession, type BoardFailure, type BoardView, type Session } from './board-contract'
 import type { ServerFilters } from './columns'
 
@@ -25,11 +24,11 @@ export async function fetchBoard(
 ): Promise<ViewResult> {
   try {
     const response = await fetch(viewUrl(filters, closedBefore), { signal, headers: { accept: 'application/json' } })
-    const parsed = parseBoardEnvelope(await response.text())
-    if (parsed instanceof type.errors) {
+    const parsed = parseBoardEnvelope.safeParse(await response.text())
+    if (!parsed.success) {
       return network(`the server answered ${response.status} with something that is not a board`)
     }
-    return parsed.ok ? { ok: true, view: parsed.view } : { ok: false, failure: parsed.failure }
+    return parsed.data.ok ? { ok: true, view: parsed.data.view } : { ok: false, failure: parsed.data.failure }
   } catch (error) {
     if (signal.aborted) throw error
     return network('the board server cannot be reached')
@@ -40,8 +39,8 @@ export async function fetchBoard(
 export async function fetchSession(signal: AbortSignal): Promise<Session | null> {
   try {
     const response = await fetch('/api/session', { signal, headers: { accept: 'application/json' } })
-    const parsed = parseSession(await response.text())
-    return parsed instanceof type.errors ? null : parsed
+    const parsed = parseSession.safeParse(await response.text())
+    return parsed.success ? parsed.data : null
   } catch (error) {
     if (signal.aborted) throw error
     return null

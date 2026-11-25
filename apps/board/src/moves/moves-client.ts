@@ -1,5 +1,4 @@
-// The browser's side of the two move routes. Every answer is parsed with arktype before the page uses it.
-import { type } from 'arktype'
+// The browser's side of the two move routes. Every answer is parsed with zod before the page uses it.
 import { TOKEN_HEADER, type BoardFailure } from '../board/board-contract'
 import {
   parseGuardRefusal,
@@ -18,11 +17,11 @@ const unreachable = 'the board server cannot be reached'
 export async function fetchLookup(id: number, signal: AbortSignal): Promise<LookupResult> {
   try {
     const response = await fetch(`/api/moves/${id}`, { signal, headers: { accept: 'application/json' } })
-    const parsed = parseLookupEnvelope(await response.text())
-    if (parsed instanceof type.errors) {
+    const parsed = parseLookupEnvelope.safeParse(await response.text())
+    if (!parsed.success) {
       return { ok: false, failure: { kind: 'output', message: `the server answered ${response.status} with no moves` } }
     }
-    return parsed.ok ? { ok: true, moves: parsed.moves } : { ok: false, failure: parsed.failure }
+    return parsed.data.ok ? { ok: true, moves: parsed.data.moves } : { ok: false, failure: parsed.data.failure }
   } catch (error) {
     if (signal.aborted) throw error
     return { ok: false, failure: { kind: 'network', message: unreachable } }
@@ -31,12 +30,12 @@ export async function fetchLookup(id: number, signal: AbortSignal): Promise<Look
 
 /** A request the write guard stopped before any move ran: 403 is a refused token or origin, 400 is a bad request. */
 function turnedAway(status: number, text: string): MoveOutcome {
-  const parsed = parseGuardRefusal(text)
-  if (parsed instanceof type.errors) {
+  const parsed = parseGuardRefusal.safeParse(text)
+  if (!parsed.success) {
     return { ok: false, kind: 'unavailable', message: `the server answered ${status} with no result` }
   }
   const kind = status === 403 ? 'forbidden' : status < 500 ? 'invalid' : 'unavailable'
-  return { ok: false, kind, message: parsed.failure.message }
+  return { ok: false, kind, message: parsed.data.failure.message }
 }
 
 /** Do a move. A refusal, a stale card and an unreachable server all come back as an outcome to show. */
@@ -48,8 +47,8 @@ export async function postMove(token: string, id: number, request: MoveRequest):
       body: JSON.stringify(request),
     })
     const text = await response.text()
-    const parsed = parseMoveOutcome(text)
-    if (!(parsed instanceof type.errors)) return parsed
+    const parsed = parseMoveOutcome.safeParse(text)
+    if (parsed.success) return parsed.data
     return turnedAway(response.status, text)
   } catch {
     return { ok: false, kind: 'unavailable', message: unreachable }

@@ -28,7 +28,7 @@ function judge(answer: (id: string, request: Parameters<JevClient['systemOne']>[
 
 it('batches questions without truncating input and retains raw responses', async () => {
   let calls = 0
-  const input = batchSchema.assert({
+  const input = batchSchema.parse({
     context: 'Shared goal',
     items: Array.from({ length: 30 }, (_, i) => ({
       id: `q${i}`,
@@ -48,7 +48,7 @@ it('batches questions without truncating input and retains raw responses', async
 })
 
 it('refuses secrets and duplicate IDs before any request', async () => {
-  const input = batchSchema.assert({
+  const input = batchSchema.parse({
     context: 'Goal',
     items: [{ id: 'q', context: 'ok', ask: { kind: 'yes_no', question: 'Relevant?' } }],
   })
@@ -82,7 +82,7 @@ it('refuses secrets and duplicate IDs before any request', async () => {
 })
 
 it('keeps pinned, missing, and uncertain sections and preserves source offsets', async () => {
-  const input = selectionSchema.assert({
+  const input = selectionSchema.parse({
     mode: 'compact',
     goal: 'Preserve the decision',
     sections: [
@@ -104,7 +104,7 @@ it('keeps pinned, missing, and uncertain sections and preserves source offsets',
 
 it('splits long sections and rejects a summary losing a pinned constraint', async () => {
   const out = directory()
-  const input = selectionSchema.assert({
+  const input = selectionSchema.parse({
     mode: 'compact',
     goal: 'Preserve constraints',
     summary: 'All done',
@@ -163,7 +163,7 @@ it('runs a bounded observe/choose/act/verify loop through adapter callbacks', as
 
 it('stops unchanged state, budget exhaustion, and stale controls', async () => {
   const out = directory()
-  const input = uiSchema.assert({ goal: 'Reach success', maxActions: 1, observation, history: [] })
+  const input = uiSchema.parse({ goal: 'Reach success', maxActions: 1, observation, history: [] })
   const first = await nextUiStep(input, out, uiClient)
   expect(first.status).toBe('action')
   expect((await nextUiStep({ ...input, history: first.history }, out, uiClient)).status).toBe('max_actions')

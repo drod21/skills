@@ -1,14 +1,16 @@
 import { createHash } from 'node:crypto'
 import { closeSync, constants, fstatSync, openSync, readSync } from 'node:fs'
 import { basename, dirname, isAbsolute } from 'node:path'
-import { type } from 'arktype'
+import * as z from 'zod'
 
-const scopeSchema = type({
-  '+': 'reject',
-  title: 'string',
-  accept: 'string',
-  'candidate?': /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/,
-  artifacts: type({ path: 'string', sha256: /^[a-f0-9]{64}$/ }).array().atLeastLength(1).atMostLength(12),
+const scopeSchema = z.strictObject({
+  title: z.string(),
+  accept: z.string(),
+  candidate: z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/).exactOptional(),
+  artifacts: z
+    .array(z.object({ path: z.string(), sha256: z.string().regex(/^[a-f0-9]{64}$/) }))
+    .min(1)
+    .max(12),
 })
 
 export const MAX_EVIDENCE_BYTES = 25 * 1024 * 1024
@@ -68,7 +70,7 @@ export function retainedEvidenceIntact(path) {
 }
 
 export function normalizeEvidenceScope(scope) {
-  const checked = scopeSchema.assert(scope)
+  const checked = scopeSchema.parse(scope)
   if (checked.artifacts.some(({ path }) => !isAbsolute(path)))
     throw new Error('scoped evidence needs absolute retained paths')
   return checked
