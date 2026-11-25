@@ -76,8 +76,8 @@ full chain, who records what, and the commands:
    ```
 
    Jev judges scope, subtlety, mechanical fit, risk, open decision, owner and
-   proof; code maps scope and subtlety to a route, then picks an executor within
-   it. An uncertain score widens the executor instead of holding, so `needs_lead`
+   proof; code maps scope and subtlety to a route, then takes the route's first
+   available executor (no second Jev call). An uncertain score widens the executor instead of holding, so `needs_lead`
    means a `risky` or `needs_decision` hold. Inspect `holds`, `roleFits`,
    `suggestedRole`, `check` and `reasons`, not only `route`. `--add` adds the
    task under Jev's suggested role when Jev is confident the submitted role does
@@ -91,7 +91,7 @@ full chain, who records what, and the commands:
 
    ```bash
    node "$TOOLKIT/scripts/team-tasks.mjs" add backend-worker 'Implement the agreed fix' \
-     --route terra_patch --accept 'The focused suite passes.'
+     --route opus_patch --accept 'The focused suite passes.'
    node "$TOOLKIT/scripts/team-tasks.mjs" add qa-worker 'Verify the fix' --after 1 \
      --route haiku_fork --accept 'The suite passes and the screenshot shows the label.'
    ```

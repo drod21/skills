@@ -1,9 +1,8 @@
 // One Jev call judges a task's properties. Code maps them to an executor, holds, role fit, and the check.
 // Jev answers what it can see in the task (scope, subtlety, risk). It never chooses the tier among overlapping
-// executor descriptions: the route is a capability tier fixed here by code. Within a tier it may pick one of
-// the available executors (jev-executors.lib.ts), but only when confident (minExecutorConfidence); any
-// other answer falls back to the tier default, so a weak or failed pick cannot change the tier or block
-// dispatch. Uncertainty widens the tier instead of waking the lead: only a hold does that.
+// executor descriptions: the route is a capability tier fixed here by code, and the tier's first available
+// executor carries it (jev-executors.lib.ts). Uncertainty widens the tier instead of waking the lead: only a
+// hold does that.
 import { choice, noul, score, type TypeSafeClient } from '@typesafe-ai/sdk'
 
 import { assertApiKeyAbsent } from './jev-guard.lib.ts'
@@ -18,7 +17,7 @@ type CatalogChecks = {
 }
 
 // The board accepts every route here (team-tasks.lib.mjs JEV_ROUTES). gemini_patch stays valid board
-// data from earlier verdicts, as does sol_patch; the table no longer emits either.
+// data from earlier verdicts, as do sol_patch, grok_patch and terra_patch; the table no longer emits them.
 export const ROUTES = JEV_ROUTES
 export type Route = (typeof ROUTES)[number]
 export type Dependency = { id: number; title: string; status: string }
@@ -78,16 +77,17 @@ export const THRESHOLDS = {
   minRoleFit: 0.6,
   minOwnerConfidence: 0.5,
   minCheckConfidence: 0.5,
-  minExecutorConfidence: 0.5, // below this, the first available executor of the tier stands
 } as const
 export type Thresholds = typeof THRESHOLDS
 
-// Rows are the scope level, columns the subtlety level. Anything subtle goes to GPT-6.1 Terra: a cheap executor
-// that gets a subtle change wrong costs a review round, which costs more than the stronger model.
+// Rows are the scope level, columns the subtlety level. Chores go to Haiku or Luna, the code workhorse is Sonnet
+// (dispatched in parallel waves, never one at a time; see dispatch.md), subtle slices go to Opus builders, and
+// only a subtle cross-package change goes to Fable. A cheap executor that gets a subtle change wrong costs a
+// review round, which costs more than the stronger model; Fable costs twice Opus, so it takes one cell.
 export const EXECUTORS: Record<Level, readonly [Route, Route, Route]> = {
-  0: ['haiku_fork', 'haiku_fork', 'terra_patch'],
-  1: ['luna_patch', 'grok_patch', 'terra_patch'],
-  2: ['sonnet_patch', 'sonnet_patch', 'terra_patch'],
+  0: ['haiku_fork', 'haiku_fork', 'opus_patch'],
+  1: ['luna_patch', 'sonnet_patch', 'opus_patch'],
+  2: ['sonnet_patch', 'sonnet_patch', 'fable_patch'],
 }
 
 const SCOPE_LEVELS = [

@@ -1,22 +1,26 @@
 // Which model carries a route. A route (jev-route.lib.ts EXECUTORS) stays a capability tier chosen from
 // scope and subtlety. The registry (scripts/jev-executors.catalog.mjs) lists the executors that can carry
-// each tier. This file filters them by what the lead's harness offers and asks Jev one choice question
-// over what is left.
-//
-// Jev picks only among executors of the tier code already chose, and only when it is confident
-// (THRESHOLDS.minExecutorConfidence). A pick that is unconfident, malformed, or names an executor that was
-// not offered falls back to the first available executor, which is the tier default whenever the default is
-// available. The fallback is what protects the old rule that Jev never decides on a weak read: a poor or
-// failed answer costs a default dispatch, never a wrong tier. The facts below are catalog facts (family,
-// list price, a name that says "code"); none is a quality claim, so Jev has nothing to rank on but the task.
-import { choice, type TypeSafeClient } from '@typesafe-ai/sdk'
+// each tier, in order. This file filters them by what the lead's harness offers; the first available entry
+// carries the task. There is no Jev call here: the tier default is the owner's model for that job, and the
+// later entries are fallbacks for an outage, never a second opinion on the model.
 import * as z from 'zod'
 
 import { TIER_EXECUTORS as catalogTiers } from './jev-executors.catalog.mjs'
-import { assertApiKeyAbsent } from './jev-guard.lib.ts'
 
-/** Routes decide() emits that dispatch to a model. sol_patch and gemini_patch stay valid board data only. */
-export const TIER_ROUTES = ['haiku_fork', 'luna_patch', 'grok_patch', 'sonnet_patch', 'terra_patch'] as const
+/**
+ * Routes with a registry tier. decide() emits all but LEGACY_TIER_ROUTES, which keep their tiers so stored
+ * verdicts and lead overrides still match. sol_patch and gemini_patch stay valid board data with no tier.
+ */
+export const TIER_ROUTES = [
+  'haiku_fork',
+  'luna_patch',
+  'grok_patch',
+  'sonnet_patch',
+  'terra_patch',
+  'opus_patch',
+  'fable_patch',
+] as const
+export const LEGACY_TIER_ROUTES = ['grok_patch', 'terra_patch'] as const
 export type TierRoute = (typeof TIER_ROUTES)[number]
 
 export type ExecutorOptions = Record<string, string | number | boolean>
@@ -53,6 +57,8 @@ const tierCatalog = z.strictObject({
   grok_patch: z.array(catalogRow),
   sonnet_patch: z.array(catalogRow),
   terra_patch: z.array(catalogRow),
+  opus_patch: z.array(catalogRow),
+  fable_patch: z.array(catalogRow),
 })
 const checkedTiersResult = tierCatalog.safeParse(catalogTiers)
 if (!checkedTiersResult.success) throw new Error(`executor catalog: ${z.prettifyError(checkedTiersResult.error)}`)
@@ -87,15 +93,8 @@ export const TIER_EXECUTORS: Record<TierRoute, readonly Executor[]> = {
   grok_patch: checkedTiers.grok_patch.map(asExecutor),
   sonnet_patch: checkedTiers.sonnet_patch.map(asExecutor),
   terra_patch: checkedTiers.terra_patch.map(asExecutor),
-}
-
-/** What each tier is for, taken from the scope x subtlety table in jev-route.lib.ts. */
-export const TIER_PURPOSE: Record<TierRoute, string> = {
-  haiku_fork: 'One file, straightforward or needing care',
-  luna_patch: 'Two or three files in one package, straightforward',
-  grok_patch: 'Two or three files in one package that must match neighboring code or a shared contract',
-  sonnet_patch: 'Several packages, straightforward or needing care',
-  terra_patch: 'Subtle change at any scope: many call sites, a shared invariant, concurrency, native timing, numbers',
+  opus_patch: checkedTiers.opus_patch.map(asExecutor),
+  fable_patch: checkedTiers.fable_patch.map(asExecutor),
 }
 
 export const isTierRoute = (route: string): route is TierRoute => (TIER_ROUTES as readonly string[]).includes(route)
@@ -196,137 +195,22 @@ export function availableFor(route: TierRoute, availability: Availability = {}):
 
 // ---- the pick ------------------------------------------------------------------------------------------
 
-/** No executor (the lead picks) or one executor with the source that chose it. */
+/** No executor (the lead picks) or the first available one. A stored `jev` source is older board data. */
 export type ExecutorPick =
   | { executor: null; source: null; reasons: string[] }
   | { executor: Executor; source: 'jev' | 'default'; reasons: string[] }
 
-const unitInterval = z
-  .number()
-  .refine((value) => Number.isFinite(value) && value >= 0 && value <= 1, 'must be a number from 0 to 1')
-// Extra fields are dropped; malformed probabilities make the answer unusable.
-const choiceAnswer = z.object({
-  choice: z.string(),
-  confidence: unitInterval,
-  probabilities: z.record(z.string(), unitInterval).exactOptional(),
-})
-
-/** What Jev answered, as read from its response. Anything else counts as no answer. */
-export type ChoiceAnswer = z.infer<typeof choiceAnswer>
-
-export function readChoice(raw: unknown, offered: readonly Executor[]): ChoiceAnswer | null {
-  const ids = new Set(offered.map((entry) => entry.id))
-  const schema = choiceAnswer.refine((value) => ids.has(value.choice))
-  const parsed = schema.safeParse(raw)
-  if (!parsed.success) return null
-  return {
-    ...parsed.data,
-    ...(parsed.data.probabilities && {
-      probabilities: Object.fromEntries(
-        Object.entries(parsed.data.probabilities).filter(([key]) => ids.has(key)),
-      ),
-    }),
-  }
-}
-
-/**
- * Pure: the executor to dispatch, given the tier's available executors and Jev's answer (null when Jev was
- * not asked or gave nothing usable). Jev's pick stands only when it is an offered id and its confidence
- * reaches `minConfidence`; otherwise the first available executor stands.
- */
-export function pickExecutor(
-  route: TierRoute,
-  offered: readonly Executor[],
-  answer: ChoiceAnswer | null,
-  minConfidence: number,
-): ExecutorPick {
+/** Pure: the first available executor of the tier, with a reason when the tier default is not available. */
+export function pickExecutor(route: TierRoute, offered: readonly Executor[]): ExecutorPick {
   const [first] = offered
   if (!first)
     return { executor: null, source: null, reasons: [`no executor is available for ${route}; the lead picks`] }
-  const reasons: string[] = []
   const tierDefault = TIER_EXECUTORS[route][0]
-  if (tierDefault && first.id !== tierDefault.id)
-    reasons.push(`tier default ${tierDefault.id} is unavailable; default is ${first.id}`)
-  if (offered.length === 1) return { executor: first, source: 'default', reasons }
-  if (!answer) {
-    reasons.push('no executor pick from Jev; took the default')
-    return { executor: first, source: 'default', reasons }
-  }
-  const picked = offered.find((entry) => entry.id === answer.choice)
-  if (!picked) {
-    reasons.push('Jev picked an executor that was not offered; took the default')
-    return { executor: first, source: 'default', reasons }
-  }
-  if (answer.confidence < minConfidence) {
-    reasons.push(
-      `executor pick ${picked.id} confidence ${answer.confidence.toFixed(2)} below floor ${minConfidence}; took the default`,
-    )
-    return { executor: first, source: 'default', reasons }
-  }
-  reasons.push(`Jev picked ${picked.id} (confidence ${answer.confidence.toFixed(2)})`)
-  return { executor: picked, source: 'jev', reasons }
-}
-
-// ---- the Jev call --------------------------------------------------------------------------------------
-
-function describe(entry: Executor): string {
-  const { family, costPerMtok, codeSpecialized: specialized } = entry.facts
-  const price = costPerMtok
-    ? `$${costPerMtok.input} in / $${costPerMtok.output} out per million tokens`
-    : 'price unknown'
-  const options = Object.entries(entry.options)
-  const defaults = options.length ? `; default ${options.map(([key, value]) => `${key}=${value}`).join(', ')}` : ''
-  return `${family} model ${entry.model} on ${entry.providerInstanceId}; ${price}${specialized ? '; code-specialized' : ''}${defaults}`
-}
-
-export type PickTask = { title: string; role: string; brief?: string; accept?: string }
-
-export function buildPickRequest(task: PickTask, route: TierRoute, offered: readonly Executor[]) {
-  const labels = Object.fromEntries(offered.map((entry) => [entry.id, describe(entry)]))
-  const brief = task.brief?.trim()
-  const accept = task.accept?.trim()
-  return {
-    state: {
-      task: { title: task.title, role: task.role, ...(brief ? { brief } : {}), ...(accept ? { accept } : {}) },
-      tier: { route, purpose: TIER_PURPOSE[route] },
-    },
-    questions: {
-      executor: choice(
-        `Which executor in \`executors\` should carry \`task\`, which is already assigned to the ${route} tier (\`tier.purpose\`)?`,
-        labels,
-      ),
-    },
-  }
-}
-
-export type PickResult = { pick: ExecutorPick; answer: ChoiceAnswer | null }
-
-/**
- * One Jev choice over the available executors. No call for zero or one executor. A failed or unreadable call
- * falls back to the default; the reason says so, so an outage is visible in the verdict.
- */
-export async function askExecutor(
-  client: Pick<TypeSafeClient, 'systemOne'>,
-  task: PickTask,
-  route: TierRoute,
-  offered: readonly Executor[],
-  minConfidence: number,
-): Promise<PickResult> {
-  if (offered.length < 2) return { pick: pickExecutor(route, offered, null, minConfidence), answer: null }
-  let answer: ChoiceAnswer | null = null
-  let failure = false
-  try {
-    const request = buildPickRequest(task, route, offered)
-    assertApiKeyAbsent(request)
-    const response = await client.systemOne(request)
-    const envelope = z.object({ answers: z.object({ executor: z.unknown() }) }).safeParse(response)
-    if (envelope.success) answer = readChoice(envelope.data.answers.executor, offered)
-  } catch {
-    failure = true
-  }
-  const pick = pickExecutor(route, offered, answer, minConfidence)
-  if (failure) pick.reasons.push('executor pick failed')
-  return { pick, answer }
+  const reasons =
+    tierDefault && first.id !== tierDefault.id
+      ? [`tier default ${tierDefault.id} is unavailable; took ${first.id}`]
+      : []
+  return { executor: first, source: 'default', reasons }
 }
 
 /** The verdict's executor field. */

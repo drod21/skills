@@ -1,6 +1,6 @@
 // The executor registry, shared by the picker (scripts/jev-executors.lib.ts) and the board
 // (scripts/team-tasks.lib.mjs). One row per executor. A tier lists those rows in order; the first is the
-// tier default. Prices are the OpenCode catalog snapshot of 2026-11-01.
+// tier default. Prices are the OpenCode catalog snapshot of 2026-11-01; Fable 5.2 is the 2026-11-25 snapshot.
 
 /** Sources a stored verdict may name. */
 export const EXECUTOR_SOURCES = ['jev', 'default']
@@ -22,6 +22,7 @@ const OC = 'opencode'
 const CLAUDE_HAIKU = row('claudeAgent_2', 'claude-haiku-5-5', 'Claude', [0.1, 0.5], { effort: 'medium' })
 const CLAUDE_SONNET = row('claudeAgent_2', 'claude-sonnet-5-5', 'Claude', [2, 10], { effort: 'high' })
 const CLAUDE_OPUS = row('claudeAgent_2', 'claude-opus-5-5', 'Claude', [4, 20], { effort: 'high' })
+const CLAUDE_FABLE = row('claudeAgent_2', 'claude-fable-5-2', 'Claude', [8, 40], { effort: 'high' })
 const CODEX_LUNA = row('codex', 'gpt-6-luna', 'GPT', [0.1, 0.5], { reasoningEffort: 'medium' })
 // Terra at its default effort (low) quits after setup, so the tier default asks for high.
 const CODEX_TERRA = row('codex', 'gpt-6.1-terra', 'GPT', [1, 5], { reasoningEffort: 'high' })
@@ -97,7 +98,12 @@ export const TIER_EXECUTORS = Object.freeze({
     OC_MISTRAL,
     OC_KIMI_PRO,
   ]),
+  // terra_patch is no longer emitted; it stays so stored verdicts and lead overrides still match.
   terra_patch: Object.freeze([CODEX_TERRA, CLAUDE_OPUS, CURSOR_OPUS, CURSOR_GEMINI, OC_GPT_SOL, OC_GEMINI, OC_KIMI_PRO]),
+  // Opus builders: one subtle slice per builder, several builders in parallel worktrees.
+  opus_patch: Object.freeze([CLAUDE_OPUS, CURSOR_OPUS, CODEX_TERRA, CURSOR_GEMINI, OC_GEMINI]),
+  // Fable: the deepest problems only (subtle and cross-package), plus the lead's own spec and split.
+  fable_patch: Object.freeze([CLAUDE_FABLE, CLAUDE_OPUS, CURSOR_OPUS]),
 })
 
 const BY_ID = new Map()

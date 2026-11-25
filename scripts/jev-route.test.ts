@@ -88,13 +88,13 @@ describe('decide', () => {
   it.each([
     [0, 0, 'haiku_fork'],
     [0, 1, 'haiku_fork'],
-    [0, 2, 'terra_patch'],
+    [0, 2, 'opus_patch'],
     [1, 0, 'luna_patch'],
-    [1, 1, 'grok_patch'],
-    [1, 2, 'terra_patch'],
+    [1, 1, 'sonnet_patch'],
+    [1, 2, 'opus_patch'],
     [2, 0, 'sonnet_patch'],
     [2, 1, 'sonnet_patch'],
-    [2, 2, 'terra_patch'],
+    [2, 2, 'fable_patch'],
   ] as const)('routes scope %i and subtlety %i to %s', (scope, subtlety, route) => {
     const d = decide(answers(scope, subtlety), task)
     expect(d.route).toBe(route)
@@ -104,7 +104,7 @@ describe('decide', () => {
 
   it('rounds a confident score to the nearest level', () => {
     expect(decide(answers(0.4, 1.4), task).route).toBe('haiku_fork')
-    expect(decide(answers(0.6, 1.6), task).route).toBe('terra_patch')
+    expect(decide(answers(0.6, 1.6), task).route).toBe('opus_patch')
   })
 
   it('widens the executor instead of holding when a score is uncertain', () => {
@@ -115,19 +115,19 @@ describe('decide', () => {
     expect(d.confidence).toBe(0.3)
 
     const subtle = decide(answers(1, 1.3, { subtletyConfidence: 0.2 }), task)
-    expect(subtle.jevRoute).toBe('grok_patch')
-    expect(subtle.route).toBe('terra_patch')
+    expect(subtle.jevRoute).toBe('sonnet_patch')
+    expect(subtle.route).toBe('opus_patch')
   })
 
   it('widens a split answer whose expected score lands on a whole level', () => {
     const split = decide(answers(1, 1, { subtletyConfidence: 0.3, subtletyProbabilities: [0.5, 0, 0.5] }), task)
-    expect(split.jevRoute).toBe('grok_patch')
-    expect(split.route).toBe('terra_patch')
+    expect(split.jevRoute).toBe('sonnet_patch')
+    expect(split.route).toBe('opus_patch')
   })
 
   it('keeps the face level when the wider level has little probability', () => {
     const d = decide(answers(1, 1.1, { subtletyConfidence: 0.3 }), task)
-    expect(d.route).toBe('grok_patch')
+    expect(d.route).toBe('sonnet_patch')
     expect(d.reasons).toEqual([])
   })
 
