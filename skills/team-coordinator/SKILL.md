@@ -45,8 +45,8 @@ full chain, who records what, and the commands:
 
 - Route every new delegate through Jev with `--available`, and dispatch the
   verdict's executor ([dispatch](references/dispatch.md)).
-- Behavior tests come first from a lightweight test worker; builders never edit
-  them ([tests first](references/tests-first.md)).
+- Behavior tests come in parallel from a lightweight test worker; builders never edit
+  them ([tests first](references/tests-first.md)). Tests are built, feature or bug fix is built, and the reviewer runs both and fixes issues.
 - Every reviewer brief carries the three scoring instructions, and reviewers fix
   what they find ([review instructions](references/pr-reviews.md#review-instructions)).
 - Brief workers by absolute path to the [worker protocol](references/worker-protocol.md)

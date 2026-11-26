@@ -3,6 +3,8 @@
 Tests are written up front from the lead's plan by a lightweight worker, builders
 build against them, and builders never touch them. The aim is no time spent
 fixing tests after the build.
+The builder kicks off in parallel - this way the builder knows nothing about the
+tests to kick things off, and speeds up our build time.
 
 1. **Plan.** Each unit's behavior is stated as checkable acceptance cases: inputs,
    expected observable result, and the level each one lives at (unit or table
