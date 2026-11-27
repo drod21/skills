@@ -46,6 +46,7 @@ tests to kick things off, and speeds up our build time.
    file. A builder may add tests in new files. A builder who believes a locked
    test is wrong stops that part, reports the test, reason and evidence to the
    lead, and continues with the rest.
+   `brief <id> --kind build` needs a non-cancelled `qa-worker` on the same `--tag` (archived counts), or `--no-test-pair --reason "<text>"`.
 4. **Wrong test.** The lead decides. If the test is wrong or the plan changed, a
    fresh test worker amends it in its own commit and the lead sends the builder
    the new SHA. The builder never makes that edit.

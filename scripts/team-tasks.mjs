@@ -130,8 +130,10 @@ const USAGE = [
   '                                          no decision but a release followed it.',
   '                                          --by must differ from the task owner',
   '  help [<command>|policy]                 print this usage, one command\'s lines, or the decision policy',
-  '  brief <id> --kind <test|build|review|verify>  print a delegate brief with the board fields filled;',
+  '  brief <id> --kind <test|build|review|verify> [--no-test-pair --reason <text>]',
+  '                                          print a delegate brief with the board fields filled;',
   '                                          the lead fills the <slots>. Read-only',
+  '                                          build needs a non-cancelled qa-worker with the same --tag (archived counts), or the opt-out',
   '  show <id> [--full]                      print one task, merging the archive for a stub.',
   '                                          Raw Jev answers only with --full',
   '  decide <id> --summary <text> [--ref <path>] [--by <owner>]',
@@ -278,7 +280,7 @@ const FLAGS = {
   route: ['--reason', '--by'],
   after: [],
   list: ['--all', '--status', '--role', '--tag', '--json'],
-  brief: ['--kind'],
+  brief: ['--kind', '--no-test-pair', '--reason'],
   help: [],
   view: ['--role', '--tag', '--owner', '--closed-limit', '--closed-before'],
   moves: ['--by'],
@@ -668,10 +670,18 @@ const COMMANDS = {
   },
   brief(file, args) {
     const kind = takeFlag(args, '--kind')
+    const reason = takeFlag(args, '--reason')
+    const noTestPair = takeSwitch(args, '--no-test-pair')
     if (!BRIEF_KINDS.includes(kind) || args.length !== 1) throw new Error(BRIEF_USAGE)
-    const id = requireId(args)
+    assertPairOptOut(kind, noTestPair, reason)
+    const task = showTask(file, requireId(args))
+    const pair = kind === 'build' && !noTestPair ? pairedTestTask(file, task) : null
+    if (kind === 'build' && !pair && !noTestPair) throw new Error(missingPairMessage(task))
     const template = readFileSync(join(import.meta.dirname, '..', 'skills/team-coordinator/references/briefs', `${kind}.md`), 'utf8')
-    console.log(fillBrief(template, showTask(file, id)).trimEnd())
+    const lines = [fillBrief(template, task).trimEnd()]
+    if (pair) lines.push(`Paired test task: ${pair.id} (${flatText(pair.title)})`)
+    if (noTestPair) lines.push(`Test pair waived: ${reason}`)
+    console.log(lines.join('\n'))
   },
   help(file, args) {
     if (args.length > 1) throw new Error('usage: help [<command>|policy]')
@@ -776,7 +786,28 @@ const column = (value) => (value == null || value === '' ? '-' : String(value).r
 const flatText = (value) => String(value ?? '').replace(CONTROL_OR_SPACE, ' ').trim()
 
 const BRIEF_KINDS = ['test', 'build', 'review', 'verify']
-const BRIEF_USAGE = 'usage: brief <id> --kind <test|build|review|verify>'
+const BRIEF_USAGE = 'usage: brief <id> --kind <test|build|review|verify> [--no-test-pair --reason <text>]'
+
+function assertPairOptOut(kind, noTestPair, reason) {
+  if (!noTestPair && reason === null) return
+  if (kind !== 'build') throw new Error(`--no-test-pair and --reason apply only to --kind build. ${BRIEF_USAGE}`)
+  if (!noTestPair) throw new Error(`--reason needs --no-test-pair. ${BRIEF_USAGE}`)
+  if (!reason?.trim()) throw new Error(`--no-test-pair needs --reason <text>. ${BRIEF_USAGE}`)
+}
+
+function pairedTestTask(file, task) {
+  if (!task.tag) return null
+  return listBoard(file, { all: true, role: 'qa-worker', tag: task.tag }).find(
+    (other) => other.id !== task.id && other.status !== 'cancelled',
+  )
+}
+
+function missingPairMessage(task) {
+  const needed = task.tag
+    ? `add a qa-worker task with --tag ${column(task.tag)}`
+    : 'it has no --tag to share with a qa-worker task'
+  return `task ${task.id} has no paired test task: ${needed}, or pass --no-test-pair --reason <text>`
+}
 
 function executorText(task) {
   const route = task.route ?? task.jev?.route
