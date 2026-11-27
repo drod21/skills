@@ -21,6 +21,11 @@ settle in the diff: an owner decision, a missing credential or approval, or a
 change outside the pull request's scope. It then fixes everything else first and
 names that one item. Never write a read-only review brief.
 
+A reviewer reads the diff, not whole files (owner, 2026-11-27). It reads `git
+diff -U10` output, opens a few lines past a hunk only to confirm a specific
+finding, and fixes what it finds in the same pass while that context is fresh.
+A brief that sends a reviewer to read every file the diff touches is wrong.
+
 A review never ends on FAIL, on any model, Astra included (owner, 2026-11-27).
 The reviewer's last line is `PASS at <head it pushed>`, or `BLOCKED at <head>:
 <item>` for the one thing it cannot settle; FAIL is not a valid ending. A
