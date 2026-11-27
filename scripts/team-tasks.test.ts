@@ -391,7 +391,7 @@ describe('brief', () => {
   const routed = { route: 'terra_patch', jevRoute: 'terra_patch', confidence: 0.9, holds: [], roleFits: true, suggestedRole: null, check: null, reasons: [], executor }
 
   it('fills a build brief from the board and leaves the lead slots open', () => {
-    seed(task(1), task(2, { title: 'Add the export button', accept: 'export.test.ts passes', after: [1], tag: 'exports', route: 'terra_patch', jev: routed }))
+    seed(task(1, { role: 'qa-worker', tag: 'exports' }), task(2, { title: 'Add the export button', accept: 'export.test.ts passes', after: [1], tag: 'exports', route: 'terra_patch', jev: routed }))
     const before = readFileSync(board, 'utf8')
     const result = cli('brief', '2', '--kind', 'build')
     expect(result.status, result.stderr).toBe(0)
@@ -413,9 +413,10 @@ describe('brief', () => {
 
   it('names no executor once a lead re-routes or holds the task, and says the verdict had none', () => {
     seed(
-      task(1, { route: 'sonnet_patch', jev: routed }),
-      task(2, { route: 'needs_lead', jev: { ...routed, route: 'needs_lead' } }),
-      task(3, { route: 'terra_patch', jev: { ...routed, executor: null } }),
+      task(1, { tag: 'unit', route: 'sonnet_patch', jev: routed }),
+      task(2, { tag: 'unit', route: 'needs_lead', jev: { ...routed, route: 'needs_lead' } }),
+      task(3, { tag: 'unit', route: 'terra_patch', jev: { ...routed, executor: null } }),
+      task(9, { role: 'qa-worker', tag: 'unit' }),
     )
     const rerouted = cli('brief', '1', '--kind', 'build').stdout
     expect(rerouted).not.toContain('codex:model-x')
@@ -430,7 +431,7 @@ describe('brief', () => {
     expect(untiered).toContain('claude_review has no tier in jev-executors.catalog.mjs')
     expect(untiered).toContain('pick one runnable catalog pair and record it in this brief')
     expect(untiered).not.toContain('first available claude_review entry')
-    seed(task(1, { route: 'claude_review' }), task(2, { route: 'sol_patch', jev: { ...routed, route: 'sol_patch', executor: null } }), task(3, { route: 'terra_patch', jev: { ...routed, route: 'needs_lead', executor: null } }))
+    seed(task(1, { tag: 'unit', route: 'claude_review' }), task(2, { tag: 'unit', route: 'sol_patch', jev: { ...routed, route: 'sol_patch', executor: null } }), task(3, { tag: 'unit', route: 'terra_patch', jev: { ...routed, route: 'needs_lead', executor: null } }), task(9, { role: 'qa-worker', tag: 'unit' }))
     for (const id of ['1', '2']) expect(cli('brief', id, '--kind', 'build').stdout).toContain('has no tier in jev-executors.catalog.mjs; pick one runnable catalog pair')
     const fromHold = cli('brief', '3', '--kind', 'build').stdout
     expect(fromHold).toContain('the verdict held this task')
