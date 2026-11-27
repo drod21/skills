@@ -101,7 +101,9 @@ instruction, make it a lint, a flag, a runtime check or a script.
   context, and an explicit model per role. Tier code delegates by difficulty:
   chores to Haiku or Luna, ordinary slices to Sonnet in parallel waves (never one
   Sonnet alone), subtle slices to Opus (one slice per builder, builders in
-  parallel worktrees), and the hardest cross-cutting work to Fable. Fast spec
+  parallel worktrees). Default leads to Opus; reserve Fable for the absolute
+  hardest coordination, planning, or execution tasks in any role, with a recorded
+  reason Opus is insufficient. Fast spec
   drafts go to GPT-6.2 Sol, a second opinion to Gemini 4 Argon, build-breaking
   playtests to GPT-6.2 Astra, and copy to Gemini 4 Neon.
   Read the user's model configuration (`~/.claude/rules/pstack-models.md` or

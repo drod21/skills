@@ -49,12 +49,14 @@ picks one catalog pair and records it in the brief.
 
 ## Model roles
 
-Each model has one job. Jev's table covers the patch tiers; the lead picks the
+Models default by job; Fable is a difficulty-based escalation across roles.
+Jev's table covers the patch tiers; the lead picks the
 pair for the other rows and records it in the brief.
 
 | Job | Route | Default pair |
 | --- | --- | --- |
-| Lead: spec, split, the hardest slice | lead, `claude_design`, `fable_patch` | `claudeAgent_2:claude-fable-5-2` |
+| Lead: coordinate, plan, split, execute | lead, `claude_design` | `claudeAgent_2:claude-opus-5-5` |
+| Absolute hardest coordination, planning, or execution, in any role | `fable_patch` or recorded lead choice | `claudeAgent_2:claude-fable-5-2` |
 | Builder: a subtle slice in its own worktree | `opus_patch` | `claudeAgent_2:claude-opus-5-5` |
 | Code workhorse: ordinary slices, in waves | `sonnet_patch` | `claudeAgent_2:claude-sonnet-5-5` |
 | Chores: one file, mechanical work | `haiku_fork`, `luna_patch` | `claudeAgent_2:claude-haiku-5-5`, `codex:gpt-6-luna` |
@@ -64,8 +66,12 @@ pair for the other rows and records it in the brief.
 | Copywriter: docs, changelog, UI copy | `gemini_patch` | `cursor:gemini-4-neon` |
 
 Codex 6.2 models default to low effort; always pass `reasoningEffort: high`.
-Fable costs twice Opus, so it takes only subtle cross-package work and the
-lead's own spec and split.
+Default to Opus for leads. Reserve Fable for the absolute hardest tasks to
+coordinate, plan, or execute, regardless of role. Record why Opus is insufficient
+before escalating. Being a lead, writing a spec, splitting work, reviewing, or
+touching several packages does not by itself qualify. Jev's scope/subtlety table
+tops out at Opus; a qualifying patch needs an explicit lead override to
+`fable_patch`.
 
 - **Opus builders:** one slice per builder. Run several builders at once, each in
   its own worktree with disjoint files; never hand one builder two slices.

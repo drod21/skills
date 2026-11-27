@@ -82,12 +82,12 @@ export type Thresholds = typeof THRESHOLDS
 
 // Rows are the scope level, columns the subtlety level. Chores go to Haiku or Luna, the code workhorse is Sonnet
 // (dispatched in parallel waves, never one at a time; see dispatch.md), subtle slices go to Opus builders, and
-// only a subtle cross-package change goes to Fable. A cheap executor that gets a subtle change wrong costs a
-// review round, which costs more than the stronger model; Fable costs twice Opus, so it takes one cell.
+// subtle cross-package changes stay with Opus. Reserve Fable for the absolute hardest coordination,
+// planning, or execution tasks via an explicit lead escalation; scope and subtlety alone do not qualify.
 export const EXECUTORS: Record<Level, readonly [Route, Route, Route]> = {
   0: ['haiku_fork', 'haiku_fork', 'opus_patch'],
   1: ['luna_patch', 'sonnet_patch', 'opus_patch'],
-  2: ['sonnet_patch', 'sonnet_patch', 'fable_patch'],
+  2: ['sonnet_patch', 'sonnet_patch', 'opus_patch'],
 }
 
 const SCOPE_LEVELS = [

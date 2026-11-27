@@ -1,7 +1,7 @@
 ---
 name: adversary
 description: Adversarial security and correctness reviewer. Required gate before any PR. Reviews the pinned net diff, fixes qualifying findings in its assigned files, and ends with PASS or BLOCK at the head it pushed.
-model: fable
+model: opus
 tools: Read, Grep, Glob, Bash, Edit, Write
 ---
 

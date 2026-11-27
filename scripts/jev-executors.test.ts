@@ -49,10 +49,12 @@ describe('executor registry', () => {
     })
   })
 
-  it('covers every dispatchable route the scope x subtlety table emits', () => {
+  it('covers emitted routes and reserves Fable for explicit escalation', () => {
     const emitted = new Set<string>(Object.values(EXECUTORS).flat())
     const current = TIER_ROUTES.filter((route) => !(LEGACY_TIER_ROUTES as readonly string[]).includes(route))
-    expect(new Set<string>(current)).toEqual(emitted)
+    expect(new Set<string>(current)).toEqual(new Set([...emitted, 'fable_patch']))
+    expect(emitted.has('fable_patch')).toBe(false)
+    expect(isTierRoute('fable_patch')).toBe(true)
     for (const route of LEGACY_TIER_ROUTES) expect(emitted.has(route)).toBe(false)
     for (const route of emitted) expect(isTierRoute(route)).toBe(true)
     expect(isTierRoute('needs_lead')).toBe(false)
