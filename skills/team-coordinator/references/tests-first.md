@@ -58,5 +58,6 @@ tests to kick things off, and speeds up our build time.
 
 This covers behavior tests. Screenshots, device runs and other runtime evidence
 stay with the builder and the QA worker. Skip the test task only for
-documentation-only changes, specs, investigations and throwaway prototypes, and
-say so in the task.
+documentation-only changes, copy-only and config-only changes that alter no
+behavior, specs, investigations and throwaway prototypes, and say so in the task
+(`--no-test-pair --reason "<kind of change>"`).

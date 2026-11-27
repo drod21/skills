@@ -14,11 +14,11 @@ brief names and cite them in the handoff. Product evidence follows the
    default branch and report if it is behind; a builder continues from its test
    commit, including any lead-approved amendment. Carry another packet's commits
    only when the brief names it. On an existing unit branch, fetch and merge that
-   branch before a push. Commit and push at each green step.
+   branch before a push. Commit and push at each green step. Load only the skills
+   the brief names; write long output to a file and read its failures or tail.
 2. **Claim.** `node "$TOOLKIT/scripts/team-tasks.mjs" claim <role> <owner> --id
-   <id> --run <kind>:<ref> [--wake <threadId>]`, kind `workflow`, `t3_task`,
-   `subagent` or `session`. If the lead already claimed for your owner, verify
-   that record instead. Without `--id` a claim takes the role's first eligible
+   <id> --run <kind>:<ref> [--wake <threadId>]`. If the lead already claimed for
+   your owner, verify that record instead. Without `--id` a claim takes the role's first eligible
    task, possibly another team's: check ID, title and route, and if it is not
    yours, stop and tell the lead. `null` means no eligible work; do not poll or
    steal a claim.

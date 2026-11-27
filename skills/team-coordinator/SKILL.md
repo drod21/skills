@@ -52,6 +52,8 @@ full chain, who records what, and the commands:
 - Brief workers by absolute path to the [worker protocol](references/worker-protocol.md)
   and the role skill, with a **Guards** line from the project's instructions.
 - A green board is not proof of deployment or release.
+- One task per agent, one review per PR head, CI runs the suites, and command
+  output goes to a file ([token budget](references/token-budget.md)).
 
 ## Plan and route
 
@@ -118,6 +120,7 @@ full chain, who records what, and the commands:
 | Writing test tasks and build briefs | [tests first](references/tests-first.md) |
 | Writing any delegate brief | `team-tasks.mjs brief <id> --kind <test\|build\|review\|verify>` fills the [template](references/briefs/build.md). Build needs a same-tag `qa-worker` or `--no-test-pair --reason "<text>"` with a nonblank reason |
 | Picking an executor, briefing, wake addresses, owner questions, replacing a worker, finishing | [dispatch and finish](references/dispatch.md) |
+| Starting an agent, adding a reviewer or helper, a long session or log | [token budget](references/token-budget.md) |
 | Briefing a reviewer or adversary, or any re-check | [PR reviews](references/pr-reviews.md) |
 | Jev option choices and receipts | [Jev decisions](references/jev-decisions.md) |
 | Jev on browser or device evidence, handoffs, filtering large evidence | [Jev execution](references/jev-execution.md#when-to-cross-check-with-jev) |
