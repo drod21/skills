@@ -19,4 +19,6 @@ file; add tests only in new files.
 - Branch from the test commit; carry other packets' commits only for: <named dependencies | none>.
 - Run your adversary review in the foreground before any pull request.
 
+Keep working until the completion criterion holds. A question the spec or the repo can answer is not a reason to stop; answer it and continue.
+
 Return the head, changed files, the green run, evidence paths and blockers.

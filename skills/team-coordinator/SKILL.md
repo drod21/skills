@@ -116,7 +116,7 @@ full chain, who records what, and the commands:
 | Preparing work or a recommendation | [owner preferences](references/owner-preferences.md) |
 | Choosing a role | [roles](references/roles.md) |
 | Writing test tasks and build briefs | [tests first](references/tests-first.md) |
-| Writing any delegate brief | `team-tasks.mjs brief <id> --kind <test\|build\|review\|verify>` prints a [template](references/briefs/build.md) with the board fields filled; fill the `<slots>` |
+| Writing any delegate brief | `team-tasks.mjs brief <id> --kind <test\|build\|review\|verify>` prints a [template](references/briefs/build.md) with the board fields filled; fill the `<slots>`. `build` needs a `qa-worker` test task on the same `--tag` |
 | Picking an executor, briefing, wake addresses, owner questions, replacing a worker, finishing | [dispatch and finish](references/dispatch.md) |
 | Briefing a reviewer or adversary, or any re-check | [PR reviews](references/pr-reviews.md) |
 | Jev option choices and receipts | [Jev decisions](references/jev-decisions.md) |

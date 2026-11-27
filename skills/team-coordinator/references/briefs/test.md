@@ -12,12 +12,13 @@ Write the failing tests and only the contract they need to compile; never the
 implementation. Branch from `origin/main` and commit them as the unit's first commit.
 
 - Acceptance cases, each citing its decision: <input, expected result, level>.
-- Expected failure: <each test fails because ...>, the reason in the board acceptance.
+- Expected failure: <each test fails because ...>, as in the board acceptance.
 - Numbered decisions: <quoted owner and lead decisions>.
-- Before the lock, run the existing tests for the affected source. Amend or
-  remove, in the lock commit, each older test that asserts the opposite of a
-  numbered decision, citing it.
+- Before the lock, run the affected source's tests. In the lock commit, amend or
+  remove each older test contradicting a numbered decision; cite it.
 
-Return the commit SHA, the locked files, the run command, `Older tests changed:
-<list> | none (<command>)`, and a red run where each test fails for its stated
-reason, with zero skips.
+Keep working until the completion criterion holds. A question the spec or the repo can answer is not a reason to stop; answer it and continue.
+
+Return the commit SHA, locked files, run command, `Older tests changed:
+<list> | none (<command>)`, and a zero-skip red run where each test fails for
+its stated reason.
