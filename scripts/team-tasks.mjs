@@ -680,6 +680,7 @@ const COMMANDS = {
     const template = readFileSync(join(import.meta.dirname, '..', 'skills/team-coordinator/references/briefs', `${kind}.md`), 'utf8')
     const lines = [fillBrief(template, task).trimEnd()]
     if (pairs.length) lines.push(pairLine(pairs))
+    if (noTestPair) lines.push(`Test pair waived: ${flatText(reason)}`)
     console.log(lines.join('\n'))
   },
   help(file, args) {
