@@ -11,7 +11,10 @@
 Review the net diff `<base>...<head>` and fix what you find; end with fixes
 pushed and a PASS at the head you pushed. First check: `git log -p <test
 commit>..<head> -- <locked files>` shows only the lead's test-worker commits.
-Add tests only in new files; a test worker or CI runs suites.
+Add tests only in new files; a test worker or CI runs suites. Read the diff
+only, never whole files: read `git diff -U10` output, and open a few lines past
+a hunk only to confirm a specific finding. Fix each finding while the diff is
+fresh.
 
 1. Score every comment: conditions, frequency 0-10, impact 1-10, evidence. No
    specifiable conditions means frequency 0.
