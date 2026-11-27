@@ -100,7 +100,7 @@ role skills, or give an accessible absolute skill path. Keep claims on the
 designated coordinator board regardless. For a pinned review, resolve the
 candidate SHA and verify that the assigned checkout's `HEAD` matches it exactly.
 
-Start every brief from `team-tasks.mjs brief <id> --kind <test|build|review|verify>`,
+Start every brief from `team-tasks.mjs brief <id> --kind <test|build|review|verify>` (build waiver: `--no-test-pair --reason "<text>"`),
 which fills the board fields and leaves the rest as `<slots>`. Give each worker: task title and ID, role skill, absolute board script,
 checkout and head, allowed files, dependencies, acceptance checks, expected
 evidence, and a **Guards** line copied from the project's instructions (how files

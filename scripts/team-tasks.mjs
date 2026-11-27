@@ -133,7 +133,7 @@ const USAGE = [
   '  brief <id> --kind <test|build|review|verify> [--no-test-pair --reason <text>]',
   '                                          print a delegate brief with the board fields filled;',
   '                                          the lead fills the <slots>. Read-only',
-  '                                          build needs a live qa-worker task with the same --tag, or the opt-out',
+  '                                          build needs a non-cancelled qa-worker with the same --tag (archived counts), or the opt-out',
   '  show <id> [--full]                      print one task, merging the archive for a stub.',
   '                                          Raw Jev answers only with --full',
   '  decide <id> --summary <text> [--ref <path>] [--by <owner>]',
@@ -675,12 +675,12 @@ const COMMANDS = {
     if (!BRIEF_KINDS.includes(kind) || args.length !== 1) throw new Error(BRIEF_USAGE)
     assertPairOptOut(kind, noTestPair, reason)
     const task = showTask(file, requireId(args))
-    const pairs = kind === 'build' ? pairedTestTasks(file, task) : []
-    if (kind === 'build' && !pairs.length && !noTestPair) throw new Error(missingPairMessage(task))
+    const pair = kind === 'build' && !noTestPair ? pairedTestTask(file, task) : null
+    if (kind === 'build' && !pair && !noTestPair) throw new Error(missingPairMessage(task))
     const template = readFileSync(join(import.meta.dirname, '..', 'skills/team-coordinator/references/briefs', `${kind}.md`), 'utf8')
     const lines = [fillBrief(template, task).trimEnd()]
-    if (pairs.length) lines.push(pairLine(pairs))
-    if (noTestPair) lines.push(`Test pair waived: ${flatText(reason)}`)
+    if (pair) lines.push(`Paired test task: ${pair.id} (${flatText(pair.title)})`)
+    if (noTestPair) lines.push(`Test pair waived: ${reason}`)
     console.log(lines.join('\n'))
   },
   help(file, args) {
@@ -795,9 +795,9 @@ function assertPairOptOut(kind, noTestPair, reason) {
   if (!reason?.trim()) throw new Error(`--no-test-pair needs --reason <text>. ${BRIEF_USAGE}`)
 }
 
-function pairedTestTasks(file, task) {
-  if (!task.tag) return []
-  return listBoard(file, { all: true, role: 'qa-worker', tag: task.tag }).filter(
+function pairedTestTask(file, task) {
+  if (!task.tag) return null
+  return listBoard(file, { all: true, role: 'qa-worker', tag: task.tag }).find(
     (other) => other.id !== task.id && other.status !== 'cancelled',
   )
 }
@@ -808,9 +808,6 @@ function missingPairMessage(task) {
     : 'it has no --tag to share with a qa-worker task'
   return `task ${task.id} has no paired test task: ${needed}, or pass --no-test-pair --reason <text>`
 }
-
-const pairLine = (pairs) =>
-  `Paired test task: ${pairs.map((pair) => `${pair.id} (${flatText(pair.title)})`).join(', ')}`
 
 function executorText(task) {
   const route = task.route ?? task.jev?.route

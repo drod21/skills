@@ -115,7 +115,7 @@ describe('build brief with a paired test task', () => {
     expect(pairLines(result.stdout)[0]).toContain('12 (Lock tests for X)')
   })
 
-  it('names every pair on the same line and leaves out tasks that are not pairs', () => {
+  it('names one eligible task when several match', () => {
     seed(
       buildTask(),
       testTask(12),
@@ -128,8 +128,7 @@ describe('build brief with a paired test task', () => {
     expect(result.status, result.stderr).toBe(0)
     const lines = pairLines(result.stdout)
     expect(lines).toHaveLength(1)
-    expect(lines[0]).toContain('12 (Lock tests for X)')
-    expect(lines[0]).toContain('13 (Verify X on device)')
+    expect(['Paired test task: 12 (Lock tests for X)', 'Paired test task: 13 (Verify X on device)']).toContain(lines[0])
     for (const title of ['Dropped tests', 'Tests for Y', 'Server half of X']) expect(result.stdout).not.toContain(title)
   })
 
@@ -149,6 +148,7 @@ describe('--no-test-pair', () => {
     const result = brief('1', '--kind', 'build', '--no-test-pair', '--reason', 'docs only change')
     expectBuildBrief(result)
     expect(result.stdout).not.toMatch(/Paired test tasks?: \d/)
+    expect(result.stdout.split('\n')).toContain('Test pair waived: docs only change')
     expect(readFileSync(board, 'utf8')).toBe(before)
   })
 
