@@ -21,6 +21,16 @@ settle in the diff: an owner decision, a missing credential or approval, or a
 change outside the pull request's scope. It then fixes everything else first and
 names that one item. Never write a read-only review brief.
 
+A review never ends on FAIL, on any model, Astra included (owner, 2026-11-27).
+The reviewer's last line is `PASS at <head it pushed>`, or `BLOCKED at <head>:
+<item>` for the one thing it cannot settle; FAIL is not a valid ending. A
+review that does end on FAIL, or with findings and no push, is unfinished.
+Send the same reviewer back to fix and push, with the PR branch checkout path
+when it runs in a shared checkout. Do not start a builder fix round for it.
+When a PR narrows its review, so that only some findings block, the reviewer
+fixes those findings in the same round and lists the rest as follow-ups. A
+narrowed round still never ends on FAIL.
+
 Reviewers and adversaries review the pinned diff and directly fix qualifying
 issues within their assigned file ownership. Do not assign them test execution,
 including after their fixes or on re-checks. They may inspect test source and add
