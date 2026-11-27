@@ -22,4 +22,7 @@ Add tests only in new files; a test worker or CI runs suites.
    any blocked qualifying issue with its owner.
 
 Submit `node {{board}} review {{id}} <findings.json> --by <owner>`; return the
-pushed head.
+pushed head. Never end on FAIL. Your last line is `PASS at <head you pushed>`,
+or `BLOCKED at <head>: <item>` when only an owner decision, a missing
+credential or approval, or a change outside the PR remains, after you have
+fixed everything else.
