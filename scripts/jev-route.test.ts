@@ -94,7 +94,7 @@ describe('decide', () => {
     [1, 2, 'opus_patch'],
     [2, 0, 'sonnet_patch'],
     [2, 1, 'sonnet_patch'],
-    [2, 2, 'fable_patch'],
+    [2, 2, 'opus_patch'],
   ] as const)('routes scope %i and subtlety %i to %s', (scope, subtlety, route) => {
     const d = decide(answers(scope, subtlety), task)
     expect(d.route).toBe(route)

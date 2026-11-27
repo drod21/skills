@@ -102,7 +102,7 @@ export const TIER_EXECUTORS = Object.freeze({
   terra_patch: Object.freeze([CODEX_TERRA, CLAUDE_OPUS, CURSOR_OPUS, CURSOR_GEMINI, OC_GPT_SOL, OC_GEMINI, OC_KIMI_PRO]),
   // Opus builders: one subtle slice per builder, several builders in parallel worktrees.
   opus_patch: Object.freeze([CLAUDE_OPUS, CURSOR_OPUS, CODEX_TERRA, CURSOR_GEMINI, OC_GEMINI]),
-  // Fable: the deepest problems only (subtle and cross-package), plus the lead's own spec and split.
+  // Fable: explicit escalation for the absolute hardest coordination, planning, or execution tasks, in any role.
   fable_patch: Object.freeze([CLAUDE_FABLE, CLAUDE_OPUS, CURSOR_OPUS]),
 })
 
