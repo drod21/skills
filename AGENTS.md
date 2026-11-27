@@ -93,7 +93,14 @@ PASS at the head the reviewer pushed. Review only the PR's net diff against a pi
 base. Score each comment (conditions, frequency 0-10, impact 1-10); fix when
 frequency x impact >= 20 or frequency >= 1 and impact >= 8; report everything
 deferred. Reviewers do not run tests; a test worker or CI does, against the final
-integrated head. No pull request opens without an `adversary` PASS at its exact head.
+integrated head. No pull request opens without an `adversary` PASS at its exact head;
+that PASS is the PR's one review unless the lead records a risk reason for another.
+
+**Token budget.** One task per agent: a delegate returns and stops, and a lead
+coordinates instead of building. Load only the skills a task names. Write long
+command output to a file and read its failures or tail. CI runs the suites; a
+test-runner agent covers only what CI does not. Details:
+`skills/team-coordinator/references/token-budget.md`.
 
 **Evidence.** Report source, synthetic, replay, runtime, device and production
 evidence separately. A green board is not a deployment. A PASS that leaves an "owed"
